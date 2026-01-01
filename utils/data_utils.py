@@ -87,11 +87,14 @@ def append_prediction_to_csv(filepath, prediction_data):
         # Create new row
         new_row = pd.DataFrame([prediction_data])
         
-        # Format Date
-        new_row['Date'] = pd.to_datetime(new_row['Date']).dt.strftime('%m/%d/%Y')
+        # Convert Date sang định dạng ISO (YYYY-MM-DD) để đồng nhất
+        if not pd.api.types.is_datetime64_any_dtype(new_row['Date']):
+            new_row['Date'] = pd.to_datetime(new_row['Date'], dayfirst=False, format='mixed')
         
-        # Append to dataframe
-        df = pd.concat([new_row, df], ignore_index=True)
+        new_row['Date'] = new_row['Date'].dt.strftime('%Y-%m-%d')
+        
+        # Append to dataframe (thêm vào cuối)
+        df = pd.concat([df, new_row], ignore_index=True)
         
         # Save back to CSV
         df.to_csv(filepath, index=False)
