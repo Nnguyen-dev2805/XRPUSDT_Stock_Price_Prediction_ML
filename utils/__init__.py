@@ -21,7 +21,9 @@ from .model_utils import (
     load_model,
     get_feature_importance,
     prepare_data_for_training,
-    create_prediction_with_confidence
+    create_prediction_with_confidence,
+    train_layer2_model,
+    predict_layer2
 )
 from .visualization import (
     plot_price_history,
@@ -51,6 +53,8 @@ __all__ = [
     'get_feature_importance',
     'prepare_data_for_training',
     'create_prediction_with_confidence',
+    'train_layer2_model',
+    'predict_layer2',
     'plot_price_history',
     'plot_candlestick',
     'plot_volume',

@@ -6,6 +6,7 @@ Training và prediction cho Layer 1
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import Ridge
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import pickle
@@ -249,3 +250,56 @@ def create_prediction_with_confidence(model, scaler, features, n_estimators=None
         'lower_bound': lower_bound,
         'upper_bound': upper_bound
     }
+
+
+def train_layer2_model(X_train, y_train, alpha=1.0):
+    """
+    Train Ridge model cho Layer 2 (Stacking)
+    
+    Args:
+        X_train: Training features (Open, Vol, RF_Pred_Today)
+        y_train: Training target (Giá đóng cửa thực tế hôm nay)
+        alpha: Regularization strength
+        
+    Returns:
+        tuple: (model, scaler)
+    """
+    # Scale features
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    
+    # Remove NaN rows
+    mask = ~np.isnan(X_train_scaled).any(axis=1)
+    X_train_clean = X_train_scaled[mask]
+    y_train_clean = y_train.iloc[mask] if isinstance(y_train, pd.Series) else y_train[mask]
+    
+    model = Ridge(alpha=alpha)
+    model.fit(X_train_clean, y_train_clean)
+    
+    return model, scaler
+
+
+def predict_layer2(model, scaler, layer2_features):
+    """
+    Dự đoán giá cuối ngày hôm nay sử dụng Layer 2 (giá trong ngày)
+    
+    Args:
+        model: Trained Ridge model
+        scaler: Fitted scaler for Layer 2
+        layer2_features: Array-like [Open, Vol, RF_Pred_Today]
+        
+    Returns:
+        float: Giá dự đoán cuối ngày
+    """
+    if isinstance(layer2_features, pd.DataFrame):
+        layer2_features = layer2_features.values
+    
+    if len(np.array(layer2_features).shape) == 1:
+        layer2_features = np.array(layer2_features).reshape(1, -1)
+    
+    # Scale features
+    features_scaled = scaler.transform(layer2_features)
+    
+    prediction = model.predict(features_scaled)[0]
+    
+    return prediction

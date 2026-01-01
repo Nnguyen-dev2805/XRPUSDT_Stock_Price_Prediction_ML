@@ -9,6 +9,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import os
 import sys
+from sklearn.metrics import mean_absolute_error
 
 # Add utils to path
 sys.path.append(os.path.dirname(__file__))
@@ -16,8 +17,8 @@ sys.path.append(os.path.dirname(__file__))
 from utils import (
     load_data, get_latest_row, get_latest_n_rows,
     create_advanced_features, get_feature_columns,
-    train_layer1_model, load_model, save_model,
-    predict_next_day_layer1, create_prediction_with_confidence,
+    train_layer1_model, train_layer2_model, load_model, save_model,
+    predict_next_day_layer1, predict_layer2, create_prediction_with_confidence,
     evaluate_model, get_feature_importance, prepare_data_for_training,
     plot_price_history, plot_candlestick, plot_volume,
     plot_technical_indicators, plot_prediction_result, plot_feature_importance,
@@ -27,8 +28,8 @@ from utils import (
 
 # Page config
 st.set_page_config(
-    page_title="Dự đoán giá XRP",
-    page_icon="📊",
+    page_title="Dự đoán giá XRP Ensemble",
+    page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -50,6 +51,7 @@ st.markdown("""
         padding: 1.5rem;
         border-radius: 10px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        color: white;
     }
     .prediction-box {
         background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
@@ -57,6 +59,7 @@ st.markdown("""
         border-radius: 15px;
         text-align: center;
         box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        color: white;
     }
     .stButton>button {
         background: linear-gradient(90deg, #00D9FF 0%, #4ECDC4 100%);
@@ -76,8 +79,12 @@ st.markdown("""
 
 # Constants
 DATA_PATH = './data/XRPUSDT_train.csv'
-MODEL_PATH = './models/layer1_rf_model.pkl'
-SCALER_PATH = './models/layer1_scaler.pkl'
+# Layer 1 paths
+L1_MODEL_PATH = './models/layer1_rf_model.pkl'
+L1_SCALER_PATH = './models/layer1_scaler.pkl'
+# Layer 2 paths
+L2_MODEL_PATH = './models/layer2_ridge_model.pkl'
+L2_SCALER_PATH = './models/layer2_scaler.pkl'
 
 # Session state initialization
 if 'model_trained' not in st.session_state:
@@ -89,31 +96,46 @@ if 'scaler' not in st.session_state:
 if 'df_features' not in st.session_state:
     st.session_state.df_features = None
 
+# Layer 2 Session States
+if 'l2_model_trained' not in st.session_state:
+    st.session_state.l2_model_trained = False
+if 'l2_model' not in st.session_state:
+    st.session_state.l2_model = None
+if 'l2_scaler' not in st.session_state:
+    st.session_state.l2_scaler = None
+
 
 def main():
     """Main application function"""
     
     # Header
-    st.markdown('<h1 class="main-header">DỰ ĐOÁN GIÁ XRP/USDT</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">DỰ ĐOÁN GIÁ XRP - 2 LAYER ENSEMBLE</h1>', unsafe_allow_html=True)
     st.markdown("---")
     
-    # Sidebar - Only Layer selection
+    # Sidebar
     with st.sidebar:
-        st.title("Mô hình")
+        st.title("Hệ thống dự đoán")
+        st.info("""
+        **Mô hình 2 Layer Stacking:**
+        1. **Layer 1 (RandomForest)**: Dự đoán dựa trên xu hướng kỹ thuật.
+        2. **Layer 2 (Ridge)**: Tối ưu hóa dự đoán dựa trên giá Open và Volume thực tế.
+        """)
         
-        # Layer selection
-        selected_layer = st.radio(
-            "Chọn Layer",
-            ["Layer 1 - RandomForest"],
-            label_visibility="collapsed"
-        )
+        if st.button("Tải & Xử lý dữ liệu thô"):
+            load_and_process_data()
         
-        st.markdown("---")
-        st.info("**Layer 1**: RandomForest Regressor\n\n**Features**: 90+ Chỉ số kỹ thuật")
+        if st.session_state.df_features is not None:
+            st.success("Dữ liệu đã sẵn sàng!")
+            st.write(f"Tổng số dòng: {len(st.session_state.df_features)}")
     
-    # Main content
-    if selected_layer == "Layer 1 - RandomForest":
+    # Tabs for different Layers
+    tab1, tab2 = st.tabs(["📊 Layer 1: Dự đoán xu hướng", "🎯 Layer 2: Dự đoán trong ngày"])
+    
+    with tab1:
         display_layer1_content()
+    
+    with tab2:
+        display_layer2_content()
 
 
 def display_layer1_content():
@@ -129,15 +151,15 @@ def display_layer1_content():
             load_and_process_data()
     
     with col2:
-        if st.button("Train mô hình mới", use_container_width=True, disabled=st.session_state.df_features is None):
+        if st.button("Train mô hình L1", use_container_width=True, disabled=st.session_state.df_features is None):
             train_model()
     
     with col3:
-        if st.button("Load mô hình đã lưu", use_container_width=True):
+        if st.button("Load L1 model", use_container_width=True):
             load_saved_model()
     
     with col4:
-        if st.button("Dự đoán ngày tiếp theo", use_container_width=True, disabled=not st.session_state.model_trained):
+        if st.button("Dự đoán xu hướng", use_container_width=True, disabled=not st.session_state.model_trained):
             make_prediction()
     
     st.markdown("---")
@@ -200,8 +222,8 @@ def train_model():
             metrics = evaluate_model(model, scaler, X_test, y_test)
             
             # Save model and scaler
-            save_model(model, MODEL_PATH)
-            save_model(scaler, MODEL_PATH.replace('_model.pkl', '_scaler.pkl'))
+            save_model(model, L1_MODEL_PATH)
+            save_model(scaler, L1_SCALER_PATH)
             
             # Add predictions to dataframe
             # Get all data with features (not just train/test split)
@@ -247,25 +269,23 @@ def train_model():
 
 
 def load_saved_model():
-    """Load pre-trained model"""
-    with st.spinner("Đang tải mô hình đã lưu..."):
+    """Load pre-trained model Layer 1"""
+    with st.spinner("Đang tải mô hình L1 đã lưu..."):
         try:
-            model = load_model(MODEL_PATH)
-            scaler = load_model(MODEL_PATH.replace('_model.pkl', '_scaler.pkl'))
+            model = load_model(L1_MODEL_PATH)
+            scaler = load_model(L1_SCALER_PATH)
             
             if model is None or scaler is None:
-                st.warning("Không tìm thấy mô hình đã lưu. Vui lòng train mô hình mới.")
+                st.warning("Không tìm thấy mô hình L1 đã lưu.")
                 return
             
             st.session_state.model = model
             st.session_state.scaler = scaler
             st.session_state.model_trained = True
             st.session_state.feature_cols = get_feature_columns()
-            
-            st.success("Đã load mô hình thành công!")
-            
+            st.success("Đã load mô hình Layer 1 thành công!")
         except Exception as e:
-            st.error(f"Lỗi khi load mô hình: {e}")
+            st.error(f"Lỗi khi load mô hình L1: {e}")
 
 
 def make_prediction():
@@ -612,6 +632,148 @@ def save_prediction_to_csv():
     else:
         st.info("Dự đoán này đã tồn tại trong tệp dữ liệu.")
 
+
+def display_layer2_content():
+    """Display Layer 2 (Within-day prediction) content"""
+    st.header("🎯 Dự đoán giá trong ngày (Layer 2)")
+    
+    if st.session_state.df_features is None:
+        st.info("Vui lòng tải dữ liệu ở Sidebar trước.")
+        return
+
+    # Train/Load buttons for L2
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Train mô hình Layer 2", use_container_width=True, disabled=not st.session_state.model_trained):
+            train_layer2_logic()
+    with col2:
+        if st.button("Load Layer 2 model", use_container_width=True):
+            load_l2_model()
+
+    st.markdown("---")
+
+    # Prediction Section
+    st.subheader("🔮 Dự đoán giá chốt phiên trực tuyến")
+    
+    # 1. Get Base Prediction from Layer 1 for the TARGET day
+    latest_row = st.session_state.df_features.iloc[-1]
+    last_date = latest_row['Date']
+    target_date = get_next_trading_date(last_date)
+    
+    # Check if we have a fresh prediction from session state or from the dataframe
+    base_pred_l1 = None
+    
+    # If RF_Pred_Tomorrow exists for the last row, that is our base prediction for target_date
+    if 'RF_Pred_Tomorrow' in latest_row and pd.notna(latest_row['RF_Pred_Tomorrow']):
+        base_pred_l1 = latest_row['RF_Pred_Tomorrow']
+    
+    # If not, check if user just hit "Make Prediction" in Layer 1 tab
+    if base_pred_l1 is None and 'prediction' in st.session_state:
+        # Check if the session prediction date matches our target date
+        if st.session_state.prediction['date'].date() == target_date.date():
+            base_pred_l1 = st.session_state.prediction['predicted_price']
+
+    if base_pred_l1 is None:
+        st.warning(f"⚠️ Chưa có dự đoán Layer 1 cho ngày {target_date.strftime('%d/%m/%Y')}. Vui lòng qua Tab Layer 1 nhấn 'Dự đoán xu hướng' hoặc 'Train mô hình L1' trước.")
+        return
+
+    st.success(f"📅 Mục tiêu: Dự đoán giá Đóng cửa cho ngày **{target_date.strftime('%d/%m/%Y')}**")
+    st.info(f"💡 Dự đoán cơ sở (Layer 1): **${base_pred_l1:.4f}**")
+
+    # 2. User Input
+    with st.form("layer2_form"):
+        st.write(f"Nhập dữ liệu thị trường thực tế của ngày {target_date.strftime('%d/%m/%Y')}:")
+        col1, col2 = st.columns(2)
+        with col1:
+            # Default value can be the base prediction or last price
+            open_price = st.number_input("Giá mở cửa (Open)", value=float(latest_row['Price']), format="%.4f")
+        with col2:
+            current_vol = st.number_input("Khối lượng dự kiến (Volume)", value=float(latest_row['Vol']), format="%.0f")
+        
+        submit = st.form_submit_button("🔥 Tính toán giá chốt phiên (Layer 2)")
+
+    if submit:
+        if st.session_state.l2_model_trained:
+            try:
+                # Prepare L2 input: [Open, Vol, RF_Pred_Today (for target day)]
+                l2_input = np.array([[open_price, current_vol, base_pred_l1]])
+                final_pred = predict_layer2(st.session_state.l2_model, st.session_state.l2_scaler, l2_input)
+                
+                # Display Results
+                st.markdown(f"""
+                <div class="prediction-box">
+                    <h3 style="color: white; margin-bottom: 0px;">Dự đoán Layer 2 cho {target_date.strftime('%d/%m/%Y')}</h3>
+                    <h1 style="color: white; font-size: 4.5rem; margin-top: 10px;">${final_pred:.4f}</h1>
+                    <p style="color: white; font-size: 1.1rem;">(Đã tối ưu hóa dựa trên Open & Volume)</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Analysis
+                diff = final_pred - base_pred_l1
+                diff_pct = (diff / base_pred_l1) * 100
+                st.write(f"Sự điều chỉnh của Layer 2 so với dự đoán kỹ thuật: **{'+' if diff > 0 else ''}{diff:.4f} ({diff_pct:.2f}%)**")
+                
+            except Exception as e:
+                st.error(f"Lỗi dự đoán L2: {e}")
+        else:
+            st.error("Vui lòng train Layer 2 tại Tab này trước!")
+
+def train_layer2_logic():
+    """Train Layer 2 Ridge Regression"""
+    with st.spinner("Đang huấn luyện Layer 2..."):
+        try:
+            df = st.session_state.df_features.copy()
+            # Features are: Open, Vol, RF_Pred_Today
+            # Target is: Price (actual close of that day)
+            l2_features = ['Open', 'Vol', 'RF_Pred_Today']
+            target = 'Price'
+            
+            # Prepare data
+            df_l2 = df.dropna(subset=l2_features + [target])
+            X = df_l2[l2_features]
+            y = df_l2[target]
+            
+            # Split
+            split_idx = int(len(X) * 0.8)
+            X_train, X_test = X[:split_idx], X[split_idx:]
+            y_train, y_test = y[:split_idx], y[split_idx:]
+            
+            # Train
+            model, scaler = train_layer2_model(X_train, y_train)
+            
+            # Evaluate
+            X_test_scaled = scaler.transform(X_test)
+            y_pred = model.predict(X_test_scaled)
+            mae = mean_absolute_error(y_test, y_pred)
+            
+            # Save
+            save_model(model, L2_MODEL_PATH)
+            save_model(scaler, L2_SCALER_PATH)
+            
+            st.session_state.l2_model = model
+            st.session_state.l2_scaler = scaler
+            st.session_state.l2_model_trained = True
+            
+            st.success(f"Đã train Layer 2 thành công! MAE: {mae:.6f}")
+            
+        except Exception as e:
+            st.error(f"Lỗi khi train L2: {e}")
+
+def load_l2_model():
+    """Load Layer 2 model"""
+    with st.spinner("Đang load Layer 2..."):
+        try:
+            model = load_model(L2_MODEL_PATH)
+            scaler = load_model(L2_SCALER_PATH)
+            if model and scaler:
+                st.session_state.l2_model = model
+                st.session_state.l2_scaler = scaler
+                st.session_state.l2_model_trained = True
+                st.success("Đã load Layer 2 thành công!")
+            else:
+                st.warning("Không tìm thấy tệp mô hình Layer 2.")
+        except Exception as e:
+            st.error(f"Lỗi: {e}")
 
 if __name__ == "__main__":
     main()

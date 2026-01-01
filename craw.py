@@ -12,7 +12,7 @@ limit = 1500
 def to_ms(date_str):
     return int(datetime.strptime(date_str, "%Y-%m-%d").timestamp() * 1000)
 
-start_time = to_ms("2024-05-27")
+start_time = to_ms("2024-05-26")
 end_time   = to_ms("2024-12-30")
 
 rows = []
