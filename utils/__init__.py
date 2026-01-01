@@ -22,8 +22,12 @@ from .model_utils import (
     get_feature_importance,
     prepare_data_for_training,
     create_prediction_with_confidence,
+<<<<<<< HEAD
     train_layer2_model,
     predict_layer2
+=======
+    predict_multi_step_layer1
+>>>>>>> e610226e9573bc65182c80046bcdc3466584c82d
 )
 from .visualization import (
     plot_price_history,
@@ -53,8 +57,12 @@ __all__ = [
     'get_feature_importance',
     'prepare_data_for_training',
     'create_prediction_with_confidence',
+<<<<<<< HEAD
     'train_layer2_model',
     'predict_layer2',
+=======
+    'predict_multi_step_layer1',
+>>>>>>> e610226e9573bc65182c80046bcdc3466584c82d
     'plot_price_history',
     'plot_candlestick',
     'plot_volume',
