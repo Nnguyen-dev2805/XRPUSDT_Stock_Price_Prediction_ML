@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis - XRP Price Prediction</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header & Navigation -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <h1>🚀 XRP Price Prediction</h1>
+                    <p>AI-Powered Cryptocurrency Analysis</p>
+                </div>
+                <nav class="navigation">
+                    <ul>
+                        <li><a href="/" class="nav-link">Dashboard</a></li>
+                        <li><a href="/predictions" class="nav-link">Predictions</a></li>
+                        <li><a href="/analysis" class="nav-link active">Analysis</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+
+            <section class="page-section">
+                <h1 class="page-title">Model Analysis</h1>
+                <p class="page-subtitle">Performance metrics and model evaluation</p>
+
+                <div class="analysis-grid">
+                    <!-- MAE by Horizon -->
+                    <div class="analysis-card">
+                        <h3>Mean Absolute Error (MAE)</h3>
+                        <div class="mae-metrics">
+                            <div class="metric">
+                                <span class="metric-label">1 Day:</span>
+                                <span class="metric-value" th:text="${stats.mae1D != null ? #numbers.formatDecimal(stats.mae1D, 1, 6) : 'N/A'}"></span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">3 Days:</span>
+                                <span class="metric-value" th:text="${stats.mae3D != null ? #numbers.formatDecimal(stats.mae3D, 1, 6) : 'N/A'}"></span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">5 Days:</span>
+                                <span class="metric-value" th:text="${stats.mae5D != null ? #numbers.formatDecimal(stats.mae5D, 1, 6) : 'N/A'}"></span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">7 Days:</span>
+                                <span class="metric-value" th:text="${stats.mae7D != null ? #numbers.formatDecimal(stats.mae7D, 1, 6) : 'N/A'}"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Direction Accuracy -->
+                    <div class="analysis-card">
+                        <h3>Direction Accuracy</h3>
+                        <div class="accuracy-display">
+                            <div class="accuracy-value" th:text="${stats.directionAccuracy != null ? #numbers.formatDecimal(stats.directionAccuracy, 1, 2) : '0'}">0</div>
+                            <div class="accuracy-unit">%</div>
+                        </div>
+                        <p class="accuracy-description">Percentage of correct price direction predictions</p>
+                    </div>
+
+                    <!-- Total Predictions -->
+                    <div class="analysis-card">
+                        <h3>Total Predictions</h3>
+                        <div class="total-display">
+                            <div class="total-value" th:text="${stats.totalPredictions != null ? #numbers.formatInteger(stats.totalPredictions) : '0'}">0</div>
+                        </div>
+                        <p class="total-description">Number of predictions made</p>
+                    </div>
+                </div>
+
+                <!-- Model Information -->
+                <div class="info-section">
+                    <h3>Model Information</h3>
+                    <div class="info-content">
+                        <div class="info-item">
+                            <h4>Architecture</h4>
+                            <p>2-Layer Ensemble Learning</p>
+                            <ul>
+                                <li>Layer 1: Random Forest Regressor (500 estimators)</li>
+                                <li>Layer 2: Ridge Regression</li>
+                            </ul>
+                        </div>
+
+                        <div class="info-item">
+                            <h4>Features Used</h4>
+                            <p>Advanced Technical Indicators:</p>
+                            <ul>
+                                <li>Moving Averages (SMA, EMA)</li>
+                                <li>Bollinger Bands</li>
+                                <li>RSI, Stochastic, ROC</li>
+                                <li>MACD</li>
+                                <li>ATR, Volatility</li>
+                                <li>Volume Analysis</li>
+                                <li>Lag Features</li>
+                            </ul>
+                        </div>
+
+                        <div class="info-item">
+                            <h4>Data Period</h4>
+                            <p>2018 - 2024 (2,192 days of historical data)</p>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>&copy; 2026 XRP Price Prediction. All rights reserved.</p>
+        </footer>
+    </div>
+</body>
+</html>
