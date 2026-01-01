@@ -12,8 +12,8 @@ limit = 1500
 def to_ms(date_str):
     return int(datetime.strptime(date_str, "%Y-%m-%d").timestamp() * 1000)
 
-start_time = to_ms("2019-01-01")
-end_time   = to_ms("2025-12-30")
+start_time = to_ms("2024-05-27")
+end_time   = to_ms("2024-12-30")
 
 rows = []
 print("Dang chay")
@@ -47,5 +47,5 @@ df = pd.DataFrame(rows, columns=[
     "Date", "Open", "High", "Low", "Price", "Vol"
 ])
 
-df.to_csv("data4.csv", index=False)
+df.to_csv("future.csv", index=False)
 print("DONE ✔")
