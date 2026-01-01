@@ -74,8 +74,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 DATA_PATH = './data/XRPUSDT_train.csv'
-MODEL_PATH = './models/layer1_rf_model.pkl'
-SCALER_PATH = './models/layer1_scaler.pkl'
+# Layer 1 paths
+L1_MODEL_PATH = './models/layer1_rf_model.pkl'
+L1_SCALER_PATH = './models/layer1_scaler.pkl'
+# Layer 2 paths
+L2_MODEL_PATH = './models/layer2_ridge_model.pkl'
+L2_SCALER_PATH = './models/layer2_scaler.pkl'
 
 # Session state initialization
 if 'model_trained' not in st.session_state:
@@ -96,15 +100,6 @@ if 'l2_model' not in st.session_state:
     st.session_state.l2_model = None
 if 'l2_scaler' not in st.session_state:
     st.session_state.l2_scaler = None
-
-# Layer 2 Session States
-if 'l2_model_trained' not in st.session_state:
-    st.session_state.l2_model_trained = False
-if 'l2_model' not in st.session_state:
-    st.session_state.l2_model = None
-if 'l2_scaler' not in st.session_state:
-    st.session_state.l2_scaler = None
-
 
 def main():
 

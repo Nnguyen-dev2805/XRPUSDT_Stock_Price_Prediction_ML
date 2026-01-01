@@ -1,12 +1,8 @@
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
-<<<<<<< HEAD
 from sklearn.linear_model import Ridge
-from sklearn.preprocessing import StandardScaler
-=======
-from sklearn.preprocessing import RobustScaler
->>>>>>> e610226e9573bc65182c80046bcdc3466584c82d
+from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import pickle
 import os
@@ -17,7 +13,6 @@ from datetime import timedelta
 def train_layer1_model(X_train, y_train, params=None):
 
     # chuẩn hóa dữ liệu
-    # scaler = StandardScaler()
     scaler = RobustScaler()
     X_train_scaled = scaler.fit_transform(X_train)
 
@@ -132,24 +127,9 @@ def prepare_data_for_training(df_features, feature_columns, target_column='Targe
     
     return X_train, X_test, y_train, y_test
 
-#### ĐOẠN NÀY CHƯA ĐỤNG ĐẾN
 def create_prediction_with_confidence(model, scaler, features, n_estimators=None):
     """
     Tạo dự đoán với confidence interval từ RandomForest
-    
-    Args:
-        model: Trained RandomForest model
-        scaler: Fitted scaler
-        features: Features để predict
-        n_estimators: Số lượng trees (None = all trees)
-    
-    Returns:
-        dict: {
-            'prediction': giá dự đoán,
-            'std': độ lệch chuẩn,
-            'lower_bound': giới hạn dưới (95% CI),
-            'upper_bound': giới hạn trên (95% CI)
-        }
     """
     if isinstance(features, pd.DataFrame):
         features = features.values
@@ -161,14 +141,13 @@ def create_prediction_with_confidence(model, scaler, features, n_estimators=None
     features_scaled = scaler.transform(features)
     
     # Get predictions from all trees
-    # Note: Using all trees to get mean and std for uncertainty
     tree_predictions = np.array([tree.predict(features_scaled)[0] for tree in model.estimators_])
     
     # Calculate statistics
     prediction = tree_predictions.mean()
     std = tree_predictions.std()
     
-    # 95% confidence interval (1.96 * std)
+    # 95% confidence interval
     lower_bound = prediction - 1.96 * std
     upper_bound = prediction + 1.96 * std
     
@@ -179,19 +158,10 @@ def create_prediction_with_confidence(model, scaler, features, n_estimators=None
         'upper_bound': upper_bound
     }
 
-<<<<<<< HEAD
 
 def train_layer2_model(X_train, y_train, alpha=1.0):
     """
     Train Ridge model cho Layer 2 (Stacking)
-    
-    Args:
-        X_train: Training features (Open, Vol, RF_Pred_Today)
-        y_train: Training target (Giá đóng cửa thực tế hôm nay)
-        alpha: Regularization strength
-        
-    Returns:
-        tuple: (model, scaler)
     """
     # Scale features
     scaler = StandardScaler()
@@ -210,15 +180,7 @@ def train_layer2_model(X_train, y_train, alpha=1.0):
 
 def predict_layer2(model, scaler, layer2_features):
     """
-    Dự đoán giá cuối ngày hôm nay sử dụng Layer 2 (giá trong ngày)
-    
-    Args:
-        model: Trained Ridge model
-        scaler: Fitted scaler for Layer 2
-        layer2_features: Array-like [Open, Vol, RF_Pred_Today]
-        
-    Returns:
-        float: Giá dự đoán cuối ngày
+    Dự đoán giá cuối ngày hôm nay sử dụng Layer 2
     """
     if isinstance(layer2_features, pd.DataFrame):
         layer2_features = layer2_features.values
@@ -232,7 +194,7 @@ def predict_layer2(model, scaler, layer2_features):
     prediction = model.predict(features_scaled)[0]
     
     return prediction
-=======
+
 # dữ đoán RF Price
 def predict_multi_step_layer1(model, scaler, df_initial, feature_cols, create_features_func, steps=7):
     forecast_results = []
@@ -245,29 +207,19 @@ def predict_multi_step_layer1(model, scaler, df_initial, feature_cols, create_fe
     last_vol = current_df['Vol'].iloc[-1]
     
     for i in range(1, steps + 1):
-        # 1. Tính toán features cho bộ dữ liệu hiện tại
         df_with_features = create_features_func(current_df)
-        
-        # 2. Xử lý NaN trong features để tránh lỗi RandomForest
-        # ffill() lấy giá trị trước đó, fillna(0) xử lý các trường hợp còn lại
         df_clean_features = df_with_features[feature_cols].ffill().fillna(0)
-        
-        # 3. Lấy features của dòng cuối cùng
         latest_features = df_clean_features.iloc[-1:].values
         
-        # 4. Scale và Predict
         latest_features_scaled = scaler.transform(latest_features)
         pred_price = model.predict(latest_features_scaled)[0]
         
-        # 5. Lưu kết quả
         next_date = last_date + timedelta(days=i)
         forecast_results.append({
             'Date': next_date,
             'Price': pred_price
         })
         
-        # 5. Cập nhật dataframe để dự đoán bước tiếp theo
-        # Sử dụng pred_price cho Open, High, Low, Price để đơn giản hóa
         new_row = {
             'Date': next_date,
             'Price': pred_price,
@@ -279,4 +231,3 @@ def predict_multi_step_layer1(model, scaler, df_initial, feature_cols, create_fe
         current_df = pd.concat([current_df, pd.DataFrame([new_row])], ignore_index=True)
         
     return pd.DataFrame(forecast_results)
->>>>>>> e610226e9573bc65182c80046bcdc3466584c82d
