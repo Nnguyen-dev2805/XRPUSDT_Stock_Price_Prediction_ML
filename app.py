@@ -788,104 +788,6 @@ def save_prediction_to_csv():
         st.info("Dự đoán này đã tồn tại trong tệp dữ liệu.")
 
 
-def display_manual_input_form():
-    """Hiển thị form nhập dữ liệu thực tế cho ngày tiếp theo"""
-    df = st.session_state.df_features
-    latest_date = df.iloc[-1]['Date']
-    next_date = get_next_trading_date(latest_date)
-    
-    st.subheader(f"Nhập dữ liệu thực tế cho ngày: {next_date.strftime('%d/%m/%Y')}")
-    
-    with st.form("manual_input_form"):
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            price = st.number_input("Price (Giá đóng cửa)", value=float(df.iloc[-1]['Price']), format="%.4f")
-            open_p = st.number_input("Open (Giá mở cửa)", value=float(df.iloc[-1]['Price']), format="%.4f")
-        with col2:
-            high = st.number_input("High (Giá cao nhất)", value=float(df.iloc[-1]['Price']), format="%.4f")
-            low = st.number_input("Low (Giá thấp nhất)", value=float(df.iloc[-1]['Price']), format="%.4f")
-        with col3:
-            vol = st.number_input("Volume (Khối lượng)", value=int(df.iloc[-1]['Vol']), step=1000)
-            
-        submit = st.form_submit_button("Dự đoán cho ngày tiếp theo")
-        
-        if submit:
-            handle_manual_input_submission(next_date, price, open_p, high, low, vol)
-    
-    # Hiển thị kết quả vừa dự đoán nếu có
-    if 'last_manual_result' in st.session_state:
-        st.markdown("#### Kết quả dự đoán cho dòng dữ liệu vừa nhập:")
-        st.dataframe(st.session_state.last_manual_result, use_container_width=True, hide_index=True)
-
-
-def handle_manual_input_submission(date, price, open_p, high, low, vol):
-    """Xử lý lưu dữ liệu thực tế và TẤT CẢ các chỉ số kỹ thuật vào CSV"""
-    try:
-        # 1. Load dữ liệu hiện tại chỉ lấy các cột gốc để tránh bị lặp cột features cũ
-        df_raw = load_data(DATA_PATH)
-        base_cols = ['Date', 'Price', 'Open', 'High', 'Low', 'Vol']
-        df_base = df_raw[base_cols].copy()
-        
-        # 2. Thêm dòng mới vào base data
-        new_row = pd.DataFrame([{
-            'Date': date,
-            'Price': price,
-            'Open': open_p,
-            'High': high,
-            'Low': low,
-            'Vol': vol
-        }])
-        df_base = pd.concat([df_base, new_row], ignore_index=True)
-        
-        # 3. Tính toán lại TOÀN BỘ features trên dữ liệu đã nối
-        df_all_features = create_advanced_features(df_base)
-        
-        # Đảm bảo RF_Pred_Today được tính từ RF_Pred_Tomorrow của ngày trước đó (nếu có)
-        if 'RF_Pred_Tomorrow' in df_raw.columns:
-            # Copy cột dự báo cũ sang để không bị mất dữ liệu lịch sử
-            df_all_features['RF_Pred_Tomorrow'] = df_raw['RF_Pred_Tomorrow']
-            df_all_features.loc[df_all_features.index[-1], 'RF_Pred_Tomorrow'] = np.nan
-        
-        # 4. Thực hiện dự báo RF_Pred_Tomorrow cho dòng vừa thêm
-        if st.session_state.model is not None and st.session_state.scaler is not None:
-            feature_cols = get_feature_columns()
-            # Xử lý NaN cho features trước khi dự báo
-            df_for_pred = df_all_features[feature_cols].copy().ffill().fillna(0)
-            latest_features = df_for_pred.iloc[-1:].values
-            
-            # Dự báo giá cho ngày tiếp theo
-            pred_val = predict_next_day_layer1(st.session_state.model, st.session_state.scaler, latest_features)
-            df_all_features.loc[df_all_features.index[-1], 'RF_Pred_Tomorrow'] = pred_val
-            
-        # 5. Cập nhật RF_Pred_Today (Lấy dự báo của ngày trước đó gán cho hôm nay)
-        if 'RF_Pred_Tomorrow' in df_all_features.columns:
-            df_all_features['RF_Pred_Today'] = df_all_features['RF_Pred_Tomorrow'].shift(1)
-            
-        # 6. Lưu TOÀN BỘ dataframe với hàng trăm cột vào CSV
-        # Chuyển Date sang string YYYY-MM-DD trước khi lưu
-        df_save = df_all_features.copy()
-        df_save['Date'] = df_save['Date'].dt.strftime('%Y-%m-%d')
-        df_save.to_csv(DATA_PATH, index=False)
-        
-        # 7. Cập nhật giao diện
-        st.session_state.df_features = df_all_features
-        
-        # Lưu dòng kết quả để hiển thị ngay dưới form
-        result_display = df_all_features.tail(1).copy()
-        result_display['Date'] = result_display['Date'].dt.strftime('%d/%m/%Y')
-        for col in result_display.columns:
-            if col != 'Date' and col != 'Vol':
-                result_display[col] = result_display[col].apply(lambda x: f"${x:.4f}" if pd.notna(x) else "N/A")
-        
-        st.session_state.last_manual_result = result_display
-        st.success(f"Đã cập nhật toàn bộ chỉ số và dự báo vào file CSV!")
-        st.rerun()
-        
-    except Exception as e:
-        st.error(f"Lỗi khi xử lý dữ liệu: {e}")
-        import traceback
-        st.error(traceback.format_exc())
-
 
 def display_manual_input_form():
     """Hiển thị form nhập dữ liệu thực tế cho ngày tiếp theo"""
@@ -1038,18 +940,21 @@ def display_layer2_content():
         st.write(f"Nhập dữ liệu thị trường thực tế của ngày {target_date.strftime('%d/%m/%Y')}:")
         col1, col2 = st.columns(2)
         with col1:
-            # Default value can be the base prediction or last price
-            open_price = st.number_input("Giá mở cửa (Open)", value=float(latest_row['Price']), format="%.4f")
+            open_price = st.number_input("Giá mở cửa (Open)", value=None, placeholder="Nhập giá mở cửa...", format="%.4f")
+            high_price = st.number_input("Giá cao nhất (High)", value=None, placeholder="Nhập giá cao nhất...", format="%.4f")
         with col2:
-            current_vol = st.number_input("Khối lượng dự kiến (Volume)", value=float(latest_row['Vol']), format="%.0f")
+            current_vol = st.number_input("Khối lượng dự kiến (Volume)", value=None, placeholder="Nhập khối lượng dự kiến...", format="%.0f")
+            low_price = st.number_input("Giá thấp nhất (Low)", value=None, placeholder="Nhập giá thấp nhất...", format="%.4f")
         
         submit = st.form_submit_button("🔥 Tính toán giá chốt phiên (Layer 2)")
 
     if submit:
-        if st.session_state.l2_model_trained:
+        if any(v is None for v in [open_price, high_price, low_price, current_vol]):
+            st.error("Vui lòng nhập đầy đủ giá Open, High, Low và Volume của ngày hôm nay!")
+        elif st.session_state.l2_model_trained:
             try:
-                # Prepare L2 input: [Open, Vol, RF_Pred_Today (for target day)]
-                l2_input = np.array([[open_price, current_vol, base_pred_l1]])
+                # Prepare L2 input: [Open, High, Low, Vol, RF_Pred_Today]
+                l2_input = np.array([[open_price, high_price, low_price, current_vol, base_pred_l1]])
                 final_pred = predict_layer2(st.session_state.l2_model, st.session_state.l2_scaler, l2_input)
                 
                 # Display Results
@@ -1057,7 +962,7 @@ def display_layer2_content():
                 <div class="prediction-box">
                     <h3 style="color: white; margin-bottom: 0px;">Dự đoán Layer 2 cho {target_date.strftime('%d/%m/%Y')}</h3>
                     <h1 style="color: white; font-size: 4.5rem; margin-top: 10px;">${final_pred:.4f}</h1>
-                    <p style="color: white; font-size: 1.1rem;">(Đã tối ưu hóa dựa trên Open & Volume)</p>
+                    <p style="color: white; font-size: 1.1rem;">(Đã tối ưu hóa dựa trên O-H-L-V)</p>
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -1076,9 +981,9 @@ def train_layer2_logic():
     with st.spinner("Đang huấn luyện Layer 2..."):
         try:
             df = st.session_state.df_features.copy()
-            # Features are: Open, Vol, RF_Pred_Today
+            # Features are: Open, High, Low, Vol, RF_Pred_Today
             # Target is: Price (actual close of that day)
-            l2_features = ['Open', 'Vol', 'RF_Pred_Today']
+            l2_features = ['Open', 'High', 'Low', 'Vol', 'RF_Pred_Today']
             target = 'Price'
             
             # Prepare data
@@ -1111,6 +1016,23 @@ def train_layer2_logic():
             
         except Exception as e:
             st.error(f"Lỗi khi train L2: {e}")
+
+
+def load_l2_model():
+    """Load Layer 2 model"""
+    with st.spinner("Đang load Layer 2..."):
+        try:
+            model = load_model(L2_MODEL_PATH)
+            scaler = load_model(L2_SCALER_PATH)
+            if model and scaler:
+                st.session_state.l2_model = model
+                st.session_state.l2_scaler = scaler
+                st.session_state.l2_model_trained = True
+                st.success("Đã load Layer 2 thành công!")
+            else:
+                st.warning("Không tìm thấy tệp mô hình Layer 2.")
+        except Exception as e:
+            st.error(f"Lỗi: {e}")
 
 
 def display_layer3_content():
