@@ -201,9 +201,17 @@ def get_feature_importance(model, feature_names, top_n=20):
     return feature_imp.head(top_n)
 
 
-def prepare_data_for_training(df_features, feature_columns, target_column='Target_Price', test_size=0.2):
+def prepare_data_for_training(df_features, target_column='Target_Price', test_size=0.2):
+    # Loại bỏ NaN cho các cột cần thiết
+    df_clean = df_features.dropna()
 
-    df_clean = df_features.dropna(subset=feature_columns + [target_column])
+    if len(df_clean) == 0:
+        raise ValueError(f"cleaned_data rỗng sau dropna(). feature_engineered_data có {len(df_clean)} dòng, nhưng tất cả đều có NaN.")
+
+    # Chọn features (loại bỏ các cột không phải số: Date, Target và các cột dự báo cũ)
+    exclude_cols = ['Date', 'Target_Price', 'Target_Return', 'Change %', 
+                    'RF_Pred_Tomorrow', 'RF_Pred_Today', 'SVR_Pred_Tomorrow', 'SVR_Pred_Today']
+    feature_columns = [col for col in df_clean.columns if col not in exclude_cols]
     
     X = df_clean[feature_columns]
     y = df_clean[target_column]
@@ -215,14 +223,11 @@ def prepare_data_for_training(df_features, feature_columns, target_column='Targe
     y_train = y[:split_idx]
     y_test = y[split_idx:]
     
-    return X_train, X_test, y_train, y_test
+    return X_train, X_test, y_train, y_test, feature_columns
 
 
-### CHƯA ĐỤNG ĐẾN
+### DỰ ĐOÁN CHO 1 NGÀY
 def create_prediction_with_confidence(model, scaler, features, n_estimators=None):
-    """
-    Tạo dự đoán với confidence interval từ RandomForest
-    """
     if isinstance(features, pd.DataFrame):
         features = features.values
     

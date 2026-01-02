@@ -21,8 +21,8 @@ def load_data(filepath):
     # Load data
     df = pd.read_csv(filepath)
     
-    # Convert Date column
-    df['Date'] = pd.to_datetime(df['Date'])
+    # Convert Date column with robust handling for mixed formats
+    df['Date'] = pd.to_datetime(df['Date'], format='mixed', dayfirst=False)
     
     # Drop Change % column if exists
     if 'Change %' in df.columns:
@@ -142,15 +142,6 @@ def validate_data(df):
 
 
 def get_next_trading_date(last_date):
-    """
-    Tính ngày giao dịch tiếp theo (bỏ qua weekend)
-    
-    Args:
-        last_date: datetime của ngày cuối cùng
-    
-    Returns:
-        datetime của ngày giao dịch tiếp theo
-    """
     next_date = last_date + timedelta(days=1)
     
     # Skip weekends (crypto trades 24/7, but we can keep daily pattern)

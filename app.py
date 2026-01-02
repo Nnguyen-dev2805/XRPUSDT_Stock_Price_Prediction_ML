@@ -74,7 +74,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-DATA_PATH = './data/XRPUSDT_train.csv'
+DISPLAY_DATA_PATH = './data/XRPUSDT_train.csv'
+SOURCE_DATA_PATH = './data/XRPUSDT20182024new.csv'
+
 # Layer 1 paths
 L1_MODEL_PATH = './models/layer1_rf_model.pkl'
 L1_SCALER_PATH = './models/layer1_scaler.pkl'
@@ -113,6 +115,10 @@ if 'df_features' not in st.session_state:
     st.session_state.df_features = None
 if 'show_manual_input' not in st.session_state:
     st.session_state.show_manual_input = False
+if 'metrics' not in st.session_state:
+    st.session_state.metrics = None
+if 'svr_metrics' not in st.session_state:
+    st.session_state.svr_metrics = None
 
 # Layer 2 Session States
 if 'l2_ridge_model_trained' not in st.session_state:
@@ -178,39 +184,47 @@ def main():
 def display_layer1_content():
     
     # Control buttons at top
+    # Control buttons at top
     st.subheader("Điều khiển mô hình Layer 1")
     
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        if st.button("🔄 Tải dữ liệu", width='stretch', type="primary"):
+    col_up, col_cmd = st.columns([2, 1])
+    with col_up:
+        uploaded_file = st.file_uploader("📂 Tải lên tệp CSV dữ liệu", type=['csv'], label_visibility="collapsed")
+        if uploaded_file is not None:
+            if st.button("🚀 Sử dụng tệp vừa tải lên", use_container_width=True):
+                load_and_process_data(uploaded_file)
+    
+    with col_cmd:
+        if st.button("🔄 Lấy dữ liệu mặc định", use_container_width=True, help="Tải dữ liệu từ file train gốc"):
             load_and_process_data()
-            
-    with col2:
-        with st.expander("🛠️ Huấn luyện Mô hình", expanded=True):
-            train_col1, train_col2 = st.columns(2)
-            with train_col1:
-                if st.button("🌲 Train RandomForest", width='stretch', disabled=st.session_state.df_features is None):
-                    train_model(model_type="RF")
-            with train_col2:
-                if st.button("📈 Train SVR", width='stretch', disabled=st.session_state.df_features is None):
-                    train_model(model_type="SVR")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    with st.expander("🛠️ Huấn luyện Mô hình Layer 1", expanded=True):
+        train_col1, train_col2 = st.columns(2)
+        with train_col1:
+            if st.button("🌲 Train RandomForest", use_container_width=True, disabled=st.session_state.df_features is None):
+                train_model(model_type="RF")
+        with train_col2:
+            if st.button("📈 Train SVR", use_container_width=True, disabled=st.session_state.df_features is None):
+                train_model(model_type="SVR")
 
     st.markdown("<br>", unsafe_allow_html=True)
     
     col_p1, col_p2, col_p3, col_p4 = st.columns(4)
     with col_p1:
-        if st.button("📂 Load saved model", width='stretch'):
+        if st.button("📂 Load saved model", use_container_width=True):
             load_saved_model()
     with col_p2:
-        if st.button("🔮 Dự đoán 1 ngày", width='stretch', 
+        if st.button("🔮 Dự đoán 1 ngày", use_container_width=True, 
                      disabled=not (st.session_state.model_trained or st.session_state.svr_model_trained)):
             make_prediction()
     with col_p3:
-        if st.button("📅 Dự đoán 7 ngày", width='stretch', 
+        if st.button("📅 Dự đoán 7 ngày", use_container_width=True, 
                      disabled=not (st.session_state.model_trained or st.session_state.svr_model_trained)):
             make_7day_prediction()
     with col_p4:
-        if st.button("🗑️ Xóa model cũ", width='stretch'):
+        if st.button("🗑️ Xóa model cũ", use_container_width=True):
             delete_old_models()
     
     st.markdown("---")
@@ -222,12 +236,19 @@ def display_layer1_content():
         st.info("Vui lòng nhấn **Tải dữ liệu** để bắt đầu")
 
 
-def load_and_process_data():
-    """Load and process data with features"""
+#### load dữ liệu
+def load_and_process_data(file_buffer=None, target_path=None):
     with st.spinner("Đang tải và xử lý dữ liệu..."):
         try:
             # Load data
-            df = load_data(DATA_PATH)
+            if file_buffer is not None:
+                df = pd.read_csv(file_buffer)
+                df['Date'] = pd.to_datetime(df['Date'])
+                df.drop(columns=['Change %'], errors='ignore', inplace=True)
+                df = df.sort_values('Date').reset_index(drop=True)
+            else:
+                path = target_path if target_path else SOURCE_DATA_PATH
+                df = load_data(path)
             
             # Validate
             is_valid, msg = validate_data(df)
@@ -238,19 +259,21 @@ def load_and_process_data():
             # Create features
             df_features = create_advanced_features(df)
             
-            # Ensure RF_Pred_Today is always the shifted version of RF_Pred_Tomorrow
-            if 'RF_Pred_Tomorrow' in df_features.columns:
-                df_features['RF_Pred_Today'] = df_features['RF_Pred_Tomorrow'].shift(1)
+            # # Sync RF & SVR predictions if they exist in the loaded file
+            # if 'RF_Pred_Tomorrow' in df_features.columns:
+            #     df_features['RF_Pred_Today'] = df_features['RF_Pred_Tomorrow'].shift(1)
+            # if 'SVR_Pred_Tomorrow' in df_features.columns:
+            #     df_features['SVR_Pred_Today'] = df_features['SVR_Pred_Tomorrow'].shift(1)
                 
             # Store in session state
             st.session_state.df_features = df_features
-            
-            st.success(f"Đã tải {len(df)} dòng dữ liệu với {len(df_features.columns)} features!")
+            st.success(f"Đã tải {len(df)} dòng dữ liệu từ {target_path if target_path else 'file nguồn'} thành công!")
             
         except Exception as e:
-            st.error(f"Lỗi khi tải dữ liệu: {e}")
+            st.error(f"Lỗi khi xử lý dữ liệu: {e}")
 
 
+#### train model
 def train_model(model_type="RF"):
     if st.session_state.df_features is None:
         st.warning("Vui lòng tải dữ liệu trước!")
@@ -260,15 +283,17 @@ def train_model(model_type="RF"):
     with st.spinner(f"Đang huấn luyện mô hình {model_name}..."):
         try:
             # Get feature columns
-            feature_cols = get_feature_columns()
+            # feature_cols = get_feature_columns()
             
             # Prepare data
-            X_train, X_test, y_train, y_test = prepare_data_for_training(
+            X_train, X_test, y_train, y_test, feature_cols = prepare_data_for_training(
                 st.session_state.df_features,
-                feature_cols,
                 target_column='Target_Price',
                 test_size=0.5
             )
+            
+            # Lưu danh sách features vào session state để dùng khi dự đoán
+            st.session_state.feature_cols = feature_cols
             
             if model_type == "RF":
                 # Train RF
@@ -282,11 +307,12 @@ def train_model(model_type="RF"):
                 st.session_state.model_trained = True
                 
                 # Add predictions to dataframe
-                df_clean = st.session_state.df_features.dropna(subset=feature_cols + ['Target_Price'])
-                X_all_scaled = scaler.transform(df_clean[feature_cols])
-                predictions = model.predict(X_all_scaled)
-                st.session_state.df_features.loc[df_clean.index, 'RF_Pred_Tomorrow'] = predictions
-                st.session_state.df_features['RF_Pred_Today'] = st.session_state.df_features['RF_Pred_Tomorrow'].shift(1)
+                # df_clean = st.session_state.df_features.dropna(subset=feature_cols + ['Target_Price'])
+                # X_all_scaled = scaler.transform(df_clean[feature_cols])
+
+                # predictions = model.predict(X_all_scaled)
+                # st.session_state.df_features.loc[df_clean.index, 'RF_Pred_Tomorrow'] = predictions
+                # st.session_state.df_features['RF_Pred_Today'] = st.session_state.df_features['RF_Pred_Tomorrow'].shift(1)
             else:
                 # Train SVR
                 model, scaler = train_svr_model(X_train, y_train)
@@ -299,15 +325,15 @@ def train_model(model_type="RF"):
                 st.session_state.svr_model_trained = True
                 
                 # Add predictions to dataframe
-                df_clean = st.session_state.df_features.dropna(subset=feature_cols + ['Target_Price'])
-                X_all_scaled = scaler.transform(df_clean[feature_cols])
-                predictions = model.predict(X_all_scaled)
-                st.session_state.df_features.loc[df_clean.index, 'SVR_Pred_Tomorrow'] = predictions
-                st.session_state.df_features['SVR_Pred_Today'] = st.session_state.df_features['SVR_Pred_Tomorrow'].shift(1)
+                # df_clean = st.session_state.df_features.dropna(subset=feature_cols + ['Target_Price'])
+                # X_all_scaled = scaler.transform(df_clean[feature_cols])
+                # predictions = model.predict(X_all_scaled)
+                # st.session_state.df_features.loc[df_clean.index, 'SVR_Pred_Tomorrow'] = predictions
+                # st.session_state.df_features['SVR_Pred_Today'] = st.session_state.df_features['SVR_Pred_Tomorrow'].shift(1)
 
             # Evaluate
             metrics = evaluate_model(model, scaler, X_test, y_test)
-            st.session_state.feature_cols = feature_cols
+            # st.session_state.feature_cols = feature_cols
             
             # Display metrics
             st.success(f"Huấn luyện mô hình {model_name} thành công!")
@@ -410,8 +436,8 @@ def delete_old_models():
         st.error(f"Lỗi khi xóa model: {e}")
 
 
+# Nhấn dự đoán 1 ngày
 def make_prediction():
-    """Make prediction for next day using available models"""
     if st.session_state.df_features is None:
         st.warning("Vui lòng tải dữ liệu trước!")
         return
@@ -423,10 +449,23 @@ def make_prediction():
     with st.spinner("Đang tính toán dự đoán..."):
         try:
             df = st.session_state.df_features
-            latest_row = df.iloc[-1]
+            # Xuất dữ liệu ra file CSV để kiểm tra
+            df.to_csv('debug_df_features.csv', index=False)
+            print(f"✅ Đã xuất dữ liệu df_features ra file: debug_df_features.csv")
             
-            # Prepare feature data (handle NaNs)
-            df_cleaned = df[st.session_state.feature_cols].ffill().fillna(0)
+            latest_row = df.iloc[-1]
+            print("\n" + "🚀 " + "="*60)
+            print("🔍 DEBUG: CHI TIẾT DÒNG DỮ LIỆU CUỐI CÙNG (LATEST ROW)")
+            print("-" * 64)
+            print(latest_row.to_string())
+            print("-" * 64)
+            print("🚀 " + "="*60 + "\n")
+            
+            # Prepare feature data (handle NaNs) - CHỈ LẤY CÁC CỘT FEATURES (Loại bỏ Date)
+            # Lấy dòng cuối cùng của df (dòng mới nhất người dùng vừa nhập hoặc tải lên)
+            feature_cols = st.session_state.feature_cols
+            df_cleaned = df[feature_cols].copy().ffill().fillna(0)
+            
             latest_features = df_cleaned.iloc[-1:].values
             pred_date = get_next_trading_date(latest_row['Date'])
             
@@ -461,6 +500,20 @@ def make_prediction():
                 'current_price': latest_row['Price'],
                 'results': comparison_results
             }
+            
+            # Thêm các phím phẳng cho tính tương thích với hàm lưu CSV (mặc định lấy RF)
+            if 'RF' in comparison_results:
+                st.session_state.prediction.update({
+                    'predicted_price': comparison_results['RF']['price'],
+                    'upper_bound': comparison_results['RF']['upper'],
+                    'lower_bound': comparison_results['RF']['lower']
+                })
+            elif 'SVR' in comparison_results:
+                st.session_state.prediction.update({
+                    'predicted_price': comparison_results['SVR']['price'],
+                    'upper_bound': comparison_results['SVR']['upper'],
+                    'lower_bound': comparison_results['SVR']['lower']
+                })
             
             st.success("Đã cập nhật dự đoán so sánh!")
             
@@ -529,10 +582,10 @@ def make_7day_prediction():
 def update_csv_with_prediction(prediction_val):
     """Update the latest row in CSV with the prediction value"""
     try:
-        df_csv = pd.read_csv(DATA_PATH)
+        df_csv = pd.read_csv(DISPLAY_DATA_PATH)
         # Assuming Date is unique and sorted
         df_csv.iloc[-1, df_csv.columns.get_loc('RF_Pred_Tomorrow')] = prediction_val
-        df_csv.to_csv(DATA_PATH, index=False)
+        df_csv.to_csv(DISPLAY_DATA_PATH, index=False)
         return True
     except Exception as e:
         st.error(f"Lỗi khi cập nhật CSV: {e}")
@@ -540,9 +593,17 @@ def update_csv_with_prediction(prediction_val):
 
 
 def display_dashboard():
-    """Display main dashboard"""
+    """Display main dashboard merging source data and saved predictions"""
     df = st.session_state.df_features
     
+    # Load display data for predictions
+    df_display = None
+    if os.path.exists(DISPLAY_DATA_PATH):
+        try:
+            df_display = pd.read_csv(DISPLAY_DATA_PATH)
+        except:
+            pass
+            
     # Latest data section - Only show latest date and single row
     st.header("Dữ liệu mới nhất")
     
@@ -578,19 +639,20 @@ def display_dashboard():
     
     # Determine which columns to show as requested by user
     base_cols = ['Date', 'Price', 'Open', 'High', 'Low', 'Vol']
-    
-    # Add prediction columns if they exist in the dataframe
-    display_cols = base_cols.copy()
-    if 'RF_Pred_Tomorrow' in df.columns:
-        display_cols.append('RF_Pred_Tomorrow')
-    if 'RF_Pred_Today' in df.columns:
-        display_cols.append('RF_Pred_Today')
-    if 'SVR_Pred_Tomorrow' in df.columns:
-        display_cols.append('SVR_Pred_Tomorrow')
-    if 'SVR_Pred_Today' in df.columns:
-        display_cols.append('SVR_Pred_Today')
-    
-    latest_row_df = df[display_cols].tail(1).copy()
+    latest_row_df = df[base_cols].tail(1).copy()
+
+    # Add prediction columns from DISPLAY_DATA_PATH if available
+    if df_display is not None and not df_display.empty:
+        last_display = df_display.iloc[-1]
+        if 'RF_Pred_Tomorrow' in df_display.columns:
+            latest_row_df['RF_Pred_Tomorrow'] = last_display['RF_Pred_Tomorrow']
+        if 'RF_Pred_Today' in df_display.columns:
+            latest_row_df['RF_Pred_Today'] = last_display['RF_Pred_Today']
+        if 'SVR_Pred_Tomorrow' in df_display.columns:
+            latest_row_df['SVR_Pred_Tomorrow'] = last_display['SVR_Pred_Tomorrow']
+        if 'SVR_Pred_Today' in df_display.columns:
+            latest_row_df['SVR_Pred_Today'] = last_display['SVR_Pred_Today']
+
     latest_row_df['Date'] = latest_row_df['Date'].dt.strftime('%d/%m/%Y')
     
     # Format numeric columns
@@ -602,7 +664,7 @@ def display_dashboard():
     if 'Vol' in latest_row_df.columns:
         latest_row_df['Vol'] = latest_row_df['Vol'].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "N/A")
     
-    st.dataframe(latest_row_df, width='stretch', hide_index=True)
+    st.dataframe(latest_row_df, use_container_width=True, hide_index=True)
     
     st.markdown("---")
 
@@ -628,19 +690,19 @@ def display_dashboard():
     
     with tab1:
         fig = plot_price_history(df, n_days=100)
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
     
     with tab2:
         fig = plot_candlestick(df, n_days=60)
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
     
     with tab3:
         fig = plot_volume(df, n_days=60)
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
     
     with tab4:
         fig = plot_technical_indicators(df, n_days=60)
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
     
     # Model performance
     # Model performance comparison
@@ -660,26 +722,32 @@ def display_dashboard():
             tab_idx = 0
             if st.session_state.model_trained:
                 with tabs[tab_idx]:
-                    metrics = st.session_state.metrics
-                    c1, c2, c3, c4 = st.columns(4)
-                    c1.metric("MAE", f"{metrics['MAE']:.6f}")
-                    c2.metric("RMSE", f"{metrics['RMSE']:.6f}")
-                    c3.metric("R² Score", f"{metrics['R2']:.4f}")
-                    c4.metric("Hướng", f"{metrics['Direction_Accuracy']:.2f}%")
+                    if 'metrics' in st.session_state and st.session_state.metrics is not None:
+                        metrics = st.session_state.metrics
+                        c1, c2, c3, c4 = st.columns(4)
+                        c1.metric("MAE", f"{metrics['MAE']:.6f}")
+                        c2.metric("RMSE", f"{metrics['RMSE']:.6f}")
+                        c3.metric("R² Score", f"{metrics['R2']:.4f}")
+                        c4.metric("Hướng", f"{metrics['Direction_Accuracy']:.2f}%")
+                    else:
+                        st.info("Chưa có thông tin đánh giá mô hình RF. Vui lòng huấn luyện lại để xem chi tiết.")
                     
                     if st.checkbox("Feature Importance (RF)", key="show_fi_rf"):
                         feature_imp = get_feature_importance(st.session_state.model, st.session_state.feature_cols, top_n=15)
-                        st.plotly_chart(plot_feature_importance(feature_imp), width='stretch')
+                        st.plotly_chart(plot_feature_importance(feature_imp), use_container_width=True)
                 tab_idx += 1
                 
             if st.session_state.svr_model_trained:
                 with tabs[tab_idx]:
-                    metrics = st.session_state.svr_metrics
-                    c1, c2, c3, c4 = st.columns(4)
-                    c1.metric("MAE", f"{metrics['MAE']:.6f}")
-                    c2.metric("RMSE", f"{metrics['RMSE']:.6f}")
-                    c3.metric("R² Score", f"{metrics['R2']:.4f}")
-                    c4.metric("Hướng", f"{metrics['Direction_Accuracy']:.2f}%")
+                    if 'svr_metrics' in st.session_state and st.session_state.svr_metrics is not None:
+                        metrics = st.session_state.svr_metrics
+                        c1, c2, c3, c4 = st.columns(4)
+                        c1.metric("MAE", f"{metrics['MAE']:.6f}")
+                        c2.metric("RMSE", f"{metrics['RMSE']:.6f}")
+                        c3.metric("R² Score", f"{metrics['R2']:.4f}")
+                        c4.metric("Hướng", f"{metrics['Direction_Accuracy']:.2f}%")
+                    else:
+                        st.info("Chưa có thông tin đánh giá mô hình SVR. Vui lòng huấn luyện lại để xem chi tiết.")
                     st.info("💡 SVR không hỗ trợ tính toán trực tiếp Feature Importance như RandomForest.")
 
 
@@ -723,7 +791,7 @@ def display_prediction_inline():
         st.markdown("<br>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1, 1, 1])
         with col2:
-            if st.button("Lưu dự đoán RF vào CSV", width='stretch'):
+            if st.button("Lưu dự đoán RF vào CSV", use_container_width=True):
                 save_prediction_to_csv()
 
 
@@ -740,7 +808,7 @@ def display_7day_prediction_inline():
         display_df = forecast_df.copy()
         display_df['Date'] = display_df['Date'].dt.strftime('%d/%m/%Y')
         display_df['Predicted_Price'] = display_df['Predicted_Price'].apply(lambda x: f"${x:.4f}")
-        st.dataframe(display_df, width='stretch', hide_index=True)
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
     
     with col2:
         st.subheader("Biểu đồ xu hướng")
@@ -776,7 +844,7 @@ def display_7day_prediction_inline():
             yaxis_title="Giá XRP ($)"
         )
         
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
 
 
 def save_prediction_to_csv():
@@ -801,7 +869,8 @@ def save_prediction_to_csv():
         
         if success:
             st.success(f"Đã cập nhật dự đoán cho ngày {pred['date'].strftime('%d/%m/%Y')} vào dữ liệu hiện có!")
-            load_and_process_data() # Reload to show updated data
+            load_and_process_data(target_path=DISPLAY_DATA_PATH) # Reload từ file vừa lưu
+            st.rerun() # Làm mới giao diện ngay lập tức
         else:
             # Fallback to append if update fails or logic dictates
             prediction_data = {
@@ -812,9 +881,10 @@ def save_prediction_to_csv():
                 'Low': pred['lower_bound'],
                 'Vol': 0
             }
-            if append_prediction_to_csv(DATA_PATH, prediction_data):
+            if append_prediction_to_csv(DISPLAY_DATA_PATH, prediction_data):
                 st.success("Đã thêm dòng dự đoán mới vào CSV!")
-                load_and_process_data()
+                load_and_process_data(target_path=DISPLAY_DATA_PATH)
+                st.rerun()
             else:
                 st.error("Lưu dự đoán thất bại")
     else:
@@ -849,14 +919,14 @@ def display_manual_input_form():
     # Hiển thị kết quả vừa dự đoán nếu có
     if 'last_manual_result' in st.session_state:
         st.markdown("#### Kết quả dự đoán cho dòng dữ liệu vừa nhập:")
-        st.dataframe(st.session_state.last_manual_result, width='stretch', hide_index=True)
+        st.dataframe(st.session_state.last_manual_result, use_container_width=True, hide_index=True)
 
 
 def handle_manual_input_submission(date, price, open_p, high, low, vol):
     """Xử lý lưu dữ liệu thực tế và TẤT CẢ các chỉ số kỹ thuật vào CSV"""
     try:
         # 1. Load dữ liệu hiện tại chỉ lấy các cột gốc để tránh bị lặp cột features cũ
-        df_raw = load_data(DATA_PATH)
+        df_raw = load_data(DISPLAY_DATA_PATH)
         base_cols = ['Date', 'Price', 'Open', 'High', 'Low', 'Vol']
         df_base = df_raw[base_cols].copy()
         
@@ -899,7 +969,7 @@ def handle_manual_input_submission(date, price, open_p, high, low, vol):
         # Chuyển Date sang string YYYY-MM-DD trước khi lưu
         df_save = df_all_features.copy()
         df_save['Date'] = df_save['Date'].dt.strftime('%Y-%m-%d')
-        df_save.to_csv(DATA_PATH, index=False)
+        df_save.to_csv(DISPLAY_DATA_PATH, index=False)
         
         # 7. Cập nhật giao diện
         st.session_state.df_features = df_all_features
@@ -932,10 +1002,10 @@ def display_layer2_content():
     # Train/Load buttons for L2
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("Train mô hình Layer 2", width='stretch', disabled=not st.session_state.model_trained):
+        if st.button("Train mô hình Layer 2", use_container_width=True, disabled=not st.session_state.model_trained):
             train_layer2_logic()
     with col2:
-        if st.button("Load Layer 2 model", width='stretch'):
+        if st.button("Load Layer 2 model", use_container_width=True):
             load_l2_model()
 
     st.markdown("---")
@@ -1110,16 +1180,16 @@ def display_layer3_content():
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        if st.button("Xử lý dữ liệu L3", width='stretch'):
+        if st.button("Xử lý dữ liệu L3", use_container_width=True):
             prepare_l3_features()
     with col2:
-        if st.button("Train mô hình L3", width='stretch'):
+        if st.button("Train mô hình L3", use_container_width=True):
             train_l3_model()
     with col3:
-        if st.button("Load L3 model", width='stretch'):
+        if st.button("Load L3 model", use_container_width=True):
             load_l3_model()
     with col4:
-        if st.button("Dự báo LSTM (7 ngày)", width='stretch', disabled=not st.session_state.l3_model_trained):
+        if st.button("Dự báo LSTM (7 ngày)", use_container_width=True, disabled=not st.session_state.l3_model_trained):
             make_l3_prediction()
 
     st.markdown("---")
@@ -1336,7 +1406,7 @@ def display_l3_prediction_results():
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
         
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
 
 
 if __name__ == "__main__":

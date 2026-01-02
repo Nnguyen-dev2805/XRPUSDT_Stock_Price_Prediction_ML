@@ -1,22 +1,8 @@
-"""
-Feature Engineering Module for XRP Price Prediction
-Tạo các technical indicators và features cho mô hình ML
-"""
-
 import pandas as pd
 import numpy as np
 
 
 def create_advanced_features(data):
-    """
-    Tạo các features kỹ thuật cho dự đoán giá cổ phiếu
-    
-    Args:
-        data: DataFrame với columns [Date, Price, Open, High, Low, Vol]
-    
-    Returns:
-        DataFrame với tất cả features đã được tạo
-    """
     feature_data = data.copy()
     
     # ==================== PRICE-BASED FEATURES ====================
@@ -120,6 +106,8 @@ def create_advanced_features(data):
     return feature_data
 
 
+
+#########
 def create_lstm_features(data):
     """
     Tạo các features chuyên biệt cho mô hình LSTM
