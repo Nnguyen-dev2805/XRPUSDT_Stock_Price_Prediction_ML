@@ -11,11 +11,11 @@ sys.path.append(os.path.dirname(__file__))
 
 from utils import (
     load_data, get_latest_row, get_latest_n_rows,
-    create_advanced_features, get_feature_columns,
+    create_advanced_features, get_feature_columns, create_lstm_features,
     train_layer1_model, train_layer2_model, load_model, save_model,
     predict_next_day_layer1, predict_layer2, create_prediction_with_confidence,
     evaluate_model, get_feature_importance, prepare_data_for_training,
-    predict_multi_step_layer1,
+    predict_multi_step_layer1, train_lstm_model, prepare_lstm_data, predict_lstm,
     plot_price_history, plot_candlestick, plot_volume,
     plot_technical_indicators, plot_prediction_result, plot_feature_importance,
     get_next_trading_date, format_number, calculate_change_percent,
@@ -24,7 +24,7 @@ from utils import (
 
 # Page config
 st.set_page_config(
-    page_title="Dự đoán giá XRP Ensemble",
+    page_title="Hệ thống Dự báo Giá XRP Đa tầng",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -80,6 +80,10 @@ L1_SCALER_PATH = './models/layer1_scaler.pkl'
 # Layer 2 paths
 L2_MODEL_PATH = './models/layer2_ridge_model.pkl'
 L2_SCALER_PATH = './models/layer2_scaler.pkl'
+# Layer 3 paths
+L3_MODEL_PATH = './models/layer3_lstm_model.keras'
+L3_SCALER_PATH = './models/layer3_scaler.pkl'
+L3_TARGET_SCALER_PATH = './models/layer3_target_scaler.pkl'
 
 # Session state initialization
 if 'model_trained' not in st.session_state:
@@ -101,19 +105,30 @@ if 'l2_model' not in st.session_state:
 if 'l2_scaler' not in st.session_state:
     st.session_state.l2_scaler = None
 
+# Layer 3 Session States
+if 'l3_model_trained' not in st.session_state:
+    st.session_state.l3_model_trained = False
+if 'l3_model' not in st.session_state:
+    st.session_state.l3_model = None
+if 'l3_scaler' not in st.session_state:
+    st.session_state.l3_scaler = None
+if 'l3_target_scaler' not in st.session_state:
+    st.session_state.l3_target_scaler = None
+
 def main():
 
     # Header
-    st.markdown('<h1 class="main-header">DỰ ĐOÁN GIÁ XRP - 2 LAYER ENSEMBLE</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">DỰ BÁO GIÁ XRP - 3 LAYER HYBRID SYSTEM</h1>', unsafe_allow_html=True)
     st.markdown("---")
     
     # Sidebar
     with st.sidebar:
-        st.title("Hệ thống dự đoán")
+        st.title("Phân tích Đa tầng")
         st.info("""
-        **Mô hình 2 Layer Stacking:**
-        1. **Layer 1 (RandomForest)**: Dự đoán dựa trên xu hướng kỹ thuật.
-        2. **Layer 2 (Ridge)**: Tối ưu hóa dự đoán dựa trên giá Open và Volume thực tế.
+        **Hệ thống dự báo 3 lớp:**
+        1. **Layer 1 (ML)**: Định hướng xu hướng trung hạn (RandomForest).
+        2. **Layer 2 (Stat)**: Tinh chỉnh dự báo trong ngày (Ridge).
+        3. **Layer 3 (DL)**: Dự báo chuỗi thời gian 7 ngày (LSTM).
         """)
         
         if st.button("Tải & Xử lý dữ liệu thô"):
@@ -124,13 +139,16 @@ def main():
             st.write(f"Tổng số dòng: {len(st.session_state.df_features)}")
     
     # Tabs for different Layers
-    tab1, tab2 = st.tabs(["📊 Layer 1: Dự đoán xu hướng", "🎯 Layer 2: Dự đoán trong ngày"])
+    tab1, tab2, tab3 = st.tabs(["📊 Layer 1: Xu hướng", "🎯 Layer 2: Trong ngày", "🧠 Layer 3: Deep Learning"])
     
     with tab1:
         display_layer1_content()
     
     with tab2:
         display_layer2_content()
+        
+    with tab3:
+        display_layer3_content()
 
 
 def display_layer1_content():
@@ -1094,21 +1112,251 @@ def train_layer2_logic():
         except Exception as e:
             st.error(f"Lỗi khi train L2: {e}")
 
-def load_l2_model():
-    """Load Layer 2 model"""
-    with st.spinner("Đang load Layer 2..."):
+
+def display_layer3_content():
+    """Hiển thị nội dung cho Layer 3 (LSTM)"""
+    st.subheader("Layer 3: Dự báo chuỗi thời gian bằng Deep Learning (LSTM)")
+    
+    # Cho phép chọn file CSV riêng cho Layer 3
+    st.markdown("### 📁 Chọn dữ liệu cho Layer 3")
+    l3_file = st.file_uploader("Tải lên file CSV (Ví dụ: ETHUSDT.csv)", type=['csv'])
+    
+    if l3_file is not None:
+        if st.button("Sử dụng file đã tải lên cho Layer 3"):
+            load_l3_custom_data(l3_file)
+            
+    st.markdown("---")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        if st.button("Xử lý dữ liệu L3", use_container_width=True):
+            prepare_l3_features()
+    with col2:
+        if st.button("Train mô hình L3", use_container_width=True):
+            train_l3_model()
+    with col3:
+        if st.button("Load L3 model", use_container_width=True):
+            load_l3_model()
+    with col4:
+        if st.button("Dự báo LSTM (7 ngày)", use_container_width=True, disabled=not st.session_state.l3_model_trained):
+            make_l3_prediction()
+
+    st.markdown("---")
+    
+    if 'l3_prediction' in st.session_state:
+        display_l3_prediction_results()
+    else:
+        st.info("Sử dụng LSTM để dự báo biến động giá trong 7 ngày tới dựa trên 30 ngày lịch sử.")
+        
+    if st.checkbox("Hiển thị kiến trúc mô hình LSTM"):
+        st.code("""
+        Model: Sequential
+        Layer 1: LSTM (64 units, return_sequences=True)
+        Layer 2: Dropout (0.2)
+        Layer 3: LSTM (32 units)
+        Layer 4: Dropout (0.2)
+        Layer 5: Dense (7 units - forecast window)
+        Optimizer: Adam (lr=0.001)
+        Loss: MSE
+        """)
+
+def load_l3_custom_data(uploaded_file):
+    """Load dữ liệu từ file upload cho Layer 3"""
+    try:
+        df = pd.read_csv(uploaded_file)
+        # Standardize columns
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'])
+        
+        # Mapping common column names if needed
+        col_map = {
+            'Close': 'Price',
+            'Volume': 'Vol'
+        }
+        df = df.rename(columns=col_map)
+        
+        # Basic requirements
+        required = ['Date', 'Price', 'Open', 'High', 'Low', 'Vol']
+        if all(col in df.columns for col in required):
+            st.session_state.df_l3_raw = df[required]
+            st.success(f"Đã tải dữ liệu từ {uploaded_file.name} cho Layer 3!")
+            st.dataframe(df.head())
+        else:
+            st.error(f"File CSV thiếu các cột bắt buộc: {required}")
+    except Exception as e:
+        st.error(f"Lỗi khi xử lý file: {e}")
+
+def prepare_l3_features():
+    """Tạo features cho LSTM"""
+    # Ưu tiên sử dụng dữ liệu riêng của L3 nếu có, nếu không lấy từ main df
+    if 'df_l3_raw' in st.session_state:
+        df = st.session_state.df_l3_raw.copy()
+    elif st.session_state.df_features is not None:
+        df = st.session_state.df_features[['Date', 'Price', 'Open', 'High', 'Low', 'Vol']]
+    else:
+        st.error("Vui lòng tải dữ liệu hoặc chọn file CSV!")
+        return
+        
+    with st.spinner("Đang tính toán technical indicators cho LSTM..."):
         try:
-            model = load_model(L2_MODEL_PATH)
-            scaler = load_model(L2_SCALER_PATH)
-            if model and scaler:
-                st.session_state.l2_model = model
-                st.session_state.l2_scaler = scaler
-                st.session_state.l2_model_trained = True
-                st.success("Đã load Layer 2 thành công!")
-            else:
-                st.warning("Không tìm thấy tệp mô hình Layer 2.")
+            df_l3 = create_lstm_features(df)
+            st.session_state.df_l3 = df_l3
+            st.success(f"Đã chuẩn bị {len(df_l3.columns)} features cho LSTM!")
+            st.dataframe(df_l3.tail(5))
         except Exception as e:
             st.error(f"Lỗi: {e}")
+
+def train_l3_model():
+    """Train LSTM model"""
+    if 'df_l3' not in st.session_state:
+        prepare_l3_features()
+        
+    df = st.session_state.df_l3.copy()
+    feature_cols = ['Open', 'High', 'Low', 'Price', 'Vol', 'VVR', 'VWAP', 
+                    'Lag_1', 'Lag_2', 'Lag_3', 'Lag_5', 'Lag_7', 
+                    'Price_Change', 'Volatility', 'MA5', 'MA10']
+    
+    df_clean = df.dropna(subset=feature_cols)
+    
+    with st.spinner("Đang huấn luyện mô hình LSTM (Deep Learning)..."):
+        try:
+            X, y, scaler, target_scaler = prepare_lstm_data(df_clean, feature_cols)
+            
+            # Split
+            n = len(X)
+            split = int(n * 0.9)
+            X_train, y_train = X[:split], y[:split]
+            
+            model = train_lstm_model(X_train, y_train)
+            
+            # Save
+            model.save(L3_MODEL_PATH)
+            save_model(scaler, L3_SCALER_PATH)
+            save_model(target_scaler, L3_TARGET_SCALER_PATH)
+            
+            st.session_state.l3_model = model
+            st.session_state.l3_scaler = scaler
+            st.session_state.l3_target_scaler = target_scaler
+            st.session_state.l3_model_trained = True
+            st.session_state.l3_feature_cols = feature_cols
+            
+            st.success("Huấn luyện Layer 3 (LSTM) thành công!")
+        except Exception as e:
+            st.error(f"Lỗi khi train LSTM: {e}")
+
+def load_l3_model():
+    """Load pre-trained LSTM model"""
+    with st.spinner("Đang load mô hình LSTM..."):
+        try:
+            from tensorflow.keras.models import load_model as load_keras_model
+            if os.path.exists(L3_MODEL_PATH):
+                st.session_state.l3_model = load_keras_model(L3_MODEL_PATH)
+                st.session_state.l3_scaler = load_model(L3_SCALER_PATH)
+                st.session_state.l3_target_scaler = load_model(L3_TARGET_SCALER_PATH)
+                st.session_state.l3_model_trained = True
+                st.session_state.l3_feature_cols = ['Open', 'High', 'Low', 'Price', 'Vol', 'VVR', 'VWAP', 
+                                                'Lag_1', 'Lag_2', 'Lag_3', 'Lag_5', 'Lag_7', 
+                                                'Price_Change', 'Volatility', 'MA5', 'MA10']
+                st.success("Đã load Layer 3 thành công!")
+            else:
+                st.warning("Không tìm thấy tệp mô hình Layer 3.")
+        except Exception as e:
+            st.error(f"Lỗi: {e}")
+
+def make_l3_prediction():
+    """Dự báo 7 ngày tới bằng LSTM"""
+    if not st.session_state.l3_model_trained:
+        st.error("Mô hình chưa được huấn luyện hoặc load!")
+        return
+        
+    try:
+        df = st.session_state.df_l3.copy()
+        feature_cols = st.session_state.l3_feature_cols
+        
+        # Lấy 30 ngày cuối để làm sequence đầu vào
+        last_30_days = df.dropna(subset=feature_cols).tail(30)
+        scaled_sequence = st.session_state.l3_scaler.transform(last_30_days[feature_cols])
+        
+        # Predict
+        pred_scaled = predict_lstm(st.session_state.l3_model, scaled_sequence)
+        
+        # Inverse transform
+        pred_prices = st.session_state.l3_target_scaler.inverse_transform(pred_scaled.reshape(-1, 1)).flatten()
+        
+        # Dates
+        last_date = df['Date'].max()
+        pred_dates = [last_date + timedelta(days=i) for i in range(1, 8)]
+        
+        pred_df = pd.DataFrame({
+            'Date': pred_dates,
+            'Predicted_Price': pred_prices
+        })
+        
+        st.session_state.l3_prediction = pred_df
+        st.success("Đã hoàn thành dự báo LSTM cho 7 ngày tới!")
+        
+    except Exception as e:
+        st.error(f"Lỗi khi dự báo LSTM: {e}")
+
+def display_l3_prediction_results():
+    """Hiển thị kết quả dự báo của LSTM"""
+    pred_df = st.session_state.l3_prediction
+    
+    # Xác định nguồn dữ liệu để hiển thị lịch sử
+    if 'df_l3' in st.session_state:
+        df_source = st.session_state.df_l3
+    elif 'df_l3_raw' in st.session_state:
+        df_source = st.session_state.df_l3_raw
+    elif st.session_state.df_features is not None:
+        df_source = st.session_state.df_features
+    else:
+        st.warning("Không tìm thấy dữ liệu lịch sử để hiển thị biểu đồ.")
+        return
+
+    df_hist = df_source.tail(20)
+    
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.subheader("Bảng dự báo 7 ngày")
+        fmt_df = pred_df.copy()
+        fmt_df['Date'] = fmt_df['Date'].dt.strftime('%d/%m/%Y')
+        fmt_df['Predicted_Price'] = fmt_df['Predicted_Price'].map('${:,.4f}'.format)
+        st.table(fmt_df)
+        
+    with col2:
+        st.subheader("Biểu đồ dự báo Deep Learning")
+        fig = go.Figure()
+        
+        # Lịch sử
+        fig.add_trace(go.Scatter(
+            x=df_hist['Date'], y=df_hist['Price'],
+            mode='lines+markers', name='Lịch sử (20 ngày)',
+            line=dict(color='white')
+        ))
+        
+        # Dự báo
+        # Nối điểm cuối lịch sử với điểm đầu dự báo
+        connect_date = [df_hist['Date'].iloc[-1]] + pred_df['Date'].tolist()
+        connect_price = [df_hist['Price'].iloc[-1]] + pred_df['Predicted_Price'].tolist()
+        
+        fig.add_trace(go.Scatter(
+            x=connect_date, y=connect_price,
+            mode='lines+markers', name='LSTM Forecast',
+            line=dict(color='#00D9FF', dash='dash', width=3)
+        ))
+        
+        fig.update_layout(
+            template='plotly_dark',
+            margin=dict(l=10, r=10, t=30, b=10),
+            height=450,
+            xaxis_title="Ngày",
+            yaxis_title="Giá XRP ($)",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+
 
 if __name__ == "__main__":
     main()

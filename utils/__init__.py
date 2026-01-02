@@ -2,7 +2,7 @@
 Utils package for XRP Price Prediction
 """
 
-from .feature_engineering import create_advanced_features, get_feature_columns
+from .feature_engineering import create_advanced_features, get_feature_columns, create_lstm_features
 from .data_utils import (
     load_data, 
     get_latest_row, 
@@ -24,7 +24,10 @@ from .model_utils import (
     create_prediction_with_confidence,
     train_layer2_model,
     predict_layer2,
-    predict_multi_step_layer1
+    predict_multi_step_layer1,
+    train_lstm_model,
+    prepare_lstm_data,
+    predict_lstm
 )
 from .visualization import (
     plot_price_history,
@@ -38,6 +41,7 @@ from .visualization import (
 __all__ = [
     'create_advanced_features',
     'get_feature_columns',
+    'create_lstm_features',
     'load_data',
     'get_latest_row',
     'get_latest_n_rows',
@@ -57,6 +61,9 @@ __all__ = [
     'train_layer2_model',
     'predict_layer2',
     'predict_multi_step_layer1',
+    'train_lstm_model',
+    'prepare_lstm_data',
+    'predict_lstm',
     'plot_price_history',
     'plot_candlestick',
     'plot_volume',
