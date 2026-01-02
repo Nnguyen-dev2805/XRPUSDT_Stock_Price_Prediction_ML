@@ -15,6 +15,7 @@ from .data_utils import (
 )
 from .model_utils import (
     train_layer1_model,
+    train_svr_model,
     evaluate_model,
     predict_next_day_layer1,
     save_model,
@@ -25,6 +26,7 @@ from .model_utils import (
     train_layer2_model,
     predict_layer2,
     predict_multi_step_layer1,
+    train_multi_horizon_models,
     train_lstm_model,
     prepare_lstm_data,
     predict_lstm
@@ -51,6 +53,7 @@ __all__ = [
     'format_number',
     'calculate_change_percent',
     'train_layer1_model',
+    'train_svr_model',
     'evaluate_model',
     'predict_next_day_layer1',
     'save_model',
@@ -61,6 +64,7 @@ __all__ = [
     'train_layer2_model',
     'predict_layer2',
     'predict_multi_step_layer1',
+    'train_multi_horizon_models',
     'train_lstm_model',
     'prepare_lstm_data',
     'predict_lstm',
