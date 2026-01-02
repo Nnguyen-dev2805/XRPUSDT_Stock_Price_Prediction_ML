@@ -1232,15 +1232,63 @@ def display_layer2_content():
 
 def train_layer2_logic():
     """Train Layer 2 (Ridge & SVR) using both L1 predictions"""
-    with st.spinner("Đang huấn luyện Layer 2..."):
+    with st.spinner("Đang chuẩn bị dữ liệu và huấn luyện Layer 2..."):
         try:
+            if st.session_state.df_features is None:
+                st.error("Vui lòng tải dữ liệu trước!")
+                return
+
+            # Check L1 models
+            if not st.session_state.model_trained or not st.session_state.svr_model_trained:
+                st.error("⚠️ Cần huấn luyện cả RandomForest và SVR (Layer 1) trước khi train Layer 2!")
+                return
+
             df = st.session_state.df_features.copy()
+            feature_cols = st.session_state.feature_cols
+            
+            # --- Generate L1 Projections for History if missing ---
+            # We need RF_Pred_Today and SVR_Pred_Today for the entire dataset to train L2
+            
+            # Prepare X_all for batch prediction
+            # Note: We must handle NaNs like we did in training
+            df_to_pred = df[feature_cols].copy().ffill().fillna(0)
+            X_all = df_to_pred.values
+            
+            # 1. Generate RF Predictions
+            rf_scaler = st.session_state.scaler
+            rf_model = st.session_state.model
+            X_all_rf_scaled = rf_scaler.transform(X_all)
+            df['RF_Pred_Tomorrow'] = rf_model.predict(X_all_rf_scaled)
+            df['RF_Pred_Today'] = df['RF_Pred_Tomorrow'].shift(1)
+            
+            # 2. Generate SVR Predictions
+            svr_scaler = st.session_state.svr_scaler
+            svr_model = st.session_state.svr_model
+            
+            # Check SVR consistency
+            if hasattr(svr_scaler, 'n_features_in_') and svr_scaler.n_features_in_ != X_all.shape[1]:
+                 st.error("⚠️ Model SVR cũ không khớp số lượng features hiện tại. Vui lòng Train lại SVR!")
+                 return
+
+            X_all_svr_scaled = svr_scaler.transform(X_all)
+            df['SVR_Pred_Tomorrow'] = svr_model.predict(X_all_svr_scaled)
+            df['SVR_Pred_Today'] = df['SVR_Pred_Tomorrow'].shift(1)
+            
+            # Update session state with new columns
+            st.session_state.df_features = df
+            
+            # --- Prepare L2 Data ---
             # Features are: Open, High, Low, Vol, RF_Pred_Today, SVR_Pred_Today
             l2_features = ['Open', 'High', 'Low', 'Vol', 'RF_Pred_Today', 'SVR_Pred_Today']
             target = 'Price'
             
-            # Prepare data
+            # Drop NaNs created by shifting
             df_l2 = df.dropna(subset=l2_features + [target])
+            
+            if len(df_l2) < 50:
+                st.error("Không đủ dữ liệu sạch để train Layer 2 (do thiếu history prediction).")
+                return
+                
             X = df_l2[l2_features]
             y = df_l2[target]
             
@@ -1255,22 +1303,24 @@ def train_layer2_logic():
             save_model(ridge_scaler, L2_RIDGE_SCALER_PATH)
             
             # Train SVR for L2
-            svr_model, svr_scaler = train_svr_model(X_train, y_train)
-            save_model(svr_model, L2_SVR_MODEL_PATH)
-            save_model(svr_scaler, L2_SVR_SCALER_PATH)
+            svr_model_l2, svr_scaler_l2 = train_svr_model(X_train, y_train)
+            save_model(svr_model_l2, L2_SVR_MODEL_PATH)
+            save_model(svr_scaler_l2, L2_SVR_SCALER_PATH)
             
             st.session_state.l2_ridge_model = ridge_model
             st.session_state.l2_ridge_scaler = ridge_scaler
             st.session_state.l2_ridge_model_trained = True
             
-            st.session_state.l2_svr_model = svr_model
-            st.session_state.l2_svr_scaler = svr_scaler
+            st.session_state.l2_svr_model = svr_model_l2
+            st.session_state.l2_svr_scaler = svr_scaler_l2
             st.session_state.l2_svr_model_trained = True
             
             st.success(f"Đã train Layer 2 (Ridge & SVR) thành công!")
             
         except Exception as e:
             st.error(f"Lỗi khi train L2: {e}")
+            import traceback
+            st.error(traceback.format_exc())
 
 
 def load_l2_model():
