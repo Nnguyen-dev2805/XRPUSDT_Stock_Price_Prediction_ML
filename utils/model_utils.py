@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
+from sklearn.svm import SVR
 from sklearn.preprocessing import StandardScaler, RobustScaler, MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import pickle
@@ -71,6 +72,32 @@ def predict_lstm(model, last_sequence):
         
     prediction = model.predict(last_sequence, verbose=0)
     return prediction[0]
+
+# train SVR model
+def train_svr_model(X_train, y_train, params=None):
+    """
+    Train SVR model với RobustScaler
+    """
+    scaler = RobustScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+
+    # loại bỏ dữ liệu NaN
+    mask = ~np.isnan(X_train_scaled).any(axis=1)
+    X_train_clean = X_train_scaled[mask]
+    y_train_clean = y_train.iloc[mask] if isinstance(y_train, pd.Series) else y_train[mask]
+    
+    if params is None:
+        params = {
+            'kernel': 'rbf',
+            'C': 100,
+            'epsilon': 0.01,
+            'gamma': 'scale'
+        }
+    
+    model = SVR(**params)
+    model.fit(X_train_clean, y_train_clean)
+    
+    return model, scaler
 
 # train model
 def train_layer1_model(X_train, y_train, params=None):
@@ -190,6 +217,8 @@ def prepare_data_for_training(df_features, feature_columns, target_column='Targe
     
     return X_train, X_test, y_train, y_test
 
+
+### CHƯA ĐỤNG ĐẾN
 def create_prediction_with_confidence(model, scaler, features, n_estimators=None):
     """
     Tạo dự đoán với confidence interval từ RandomForest
@@ -258,39 +287,157 @@ def predict_layer2(model, scaler, layer2_features):
     
     return prediction
 
-# dữ đoán RF Price
-def predict_multi_step_layer1(model, scaler, df_initial, feature_cols, create_features_func, steps=7):
+# Train 7 models - mỗi model dự báo 1 ngày cụ thể (giống TrainStock2Layer)
+def train_multi_horizon_models(df_features, feature_columns, days=7):
+    """
+    Train 7 model RandomForest riêng, mỗi model dự báo 1 ngày cụ thể
+    
+    Parameters:
+    -----------
+    df_features : DataFrame
+        Dữ liệu đã tạo features
+    feature_columns : list
+        Danh sách các cột features
+    days : int
+        Số ngày dự báo (mặc định = 7)
+    
+    Returns:
+    --------
+    dict : {
+        'models': {1: model_1d, 2: model_2d, ..., 7: model_7d},
+        'datasets': {1: {...}, 2: {...}, ...},
+        'scalers': {1: scaler_1d, 2: scaler_2d, ...}
+    }
+    """
+    df_sorted = df_features.sort_values('Date').reset_index(drop=True)
+    
+    # Tạo target đa horizon
+    for day in range(1, days + 1):
+        df_sorted[f'Target_Price_{day}D'] = df_sorted['Price'].shift(-day)
+    
+    horizon_models = {}
+    horizon_datasets = {}
+    horizon_scalers = {}
+    
+    for day in range(1, days + 1):
+        print(f"\n{'='*80}")
+        print(f"TRAINING MODEL – DỰ ĐOÁN {day} NGÀY")
+        print(f"{'='*80}")
+        
+        target_col = f'Target_Price_{day}D'
+        
+        # Drop NaN
+        df_clean = df_sorted.dropna(subset=feature_columns + [target_col])
+        
+        X = df_clean[feature_columns]
+        y = df_clean[target_col]
+        
+        # Time-based split (40% train, 60% test)
+        split_idx = int(len(X) * 0.4)
+        X_train, X_test = X[:split_idx], X[split_idx:]
+        y_train, y_test = y[:split_idx], y[split_idx:]
+        
+        # Get dates
+        test_dates = df_clean.loc[X_test.index, 'Date']
+        
+        # Scaling
+        scaler = RobustScaler()
+        X_train_scaled = scaler.fit_transform(X_train)
+        X_test_scaled = scaler.transform(X_test)
+        
+        X_train_scaled = pd.DataFrame(
+            X_train_scaled,
+            columns=feature_columns,
+            index=X_train.index
+        )
+        X_test_scaled = pd.DataFrame(
+            X_test_scaled,
+            columns=feature_columns,
+            index=X_test.index
+        )
+        
+        # Train RandomForest
+        model = RandomForestRegressor(
+            n_estimators=500,
+            max_depth=8,
+            min_samples_leaf=20,
+            random_state=42,
+            n_jobs=-1
+        )
+        model.fit(X_train_scaled, y_train)
+        
+        horizon_models[day] = model
+        horizon_scalers[day] = scaler
+        horizon_datasets[day] = {
+            'X_test': X_test_scaled,
+            'y_test': y_test,
+            'test_dates': test_dates
+        }
+        
+        print(f"✓ Samples: Train={len(X_train)}, Test={len(X_test)}")
+        print(f"✓ Test Period: {test_dates.min().date()} → {test_dates.max().date()}")
+    
+    return {
+        'models': horizon_models,
+        'datasets': horizon_datasets,
+        'scalers': horizon_scalers
+    }
+
+
+# dự đoán RF Price với 7 models
+def predict_multi_step_layer1(models_dict, scalers_dict, df_initial, feature_cols, 
+                              create_features_func, days=7):
+    """
+    Dự báo giá 7 ngày sử dụng 7 model riêng (giống TrainStock2Layer)
+    
+    Parameters:
+    -----------
+    models_dict : dict
+        Từ điển chứa các model {1: model_1d, 2: model_2d, ..., 7: model_7d}
+    scalers_dict : dict
+        Từ điển chứa các scaler {1: scaler_1d, 2: scaler_2d, ...}
+    df_initial : DataFrame
+        Dữ liệu lịch sử
+    feature_cols : list
+        Danh sách các cột features
+    create_features_func : function
+        Hàm tạo features từ dữ liệu gốc
+    days : int
+        Số ngày dự báo (mặc định = 7)
+    
+    Returns:
+    --------
+    DataFrame : Dự báo 7 ngày với các cột [Date, Day, Predicted_Price]
+    """
     forecast_results = []
     current_df = df_initial.tail(60).copy()
     
     if not pd.api.types.is_datetime64_any_dtype(current_df['Date']):
         current_df['Date'] = pd.to_datetime(current_df['Date'])
-        
+    
     last_date = current_df['Date'].max()
     last_vol = current_df['Vol'].iloc[-1]
     
-    for i in range(1, steps + 1):
-        df_with_features = create_features_func(current_df)
-        df_clean_features = df_with_features[feature_cols].ffill().fillna(0)
-        latest_features = df_clean_features.iloc[-1:].values
+    # Tạo features từ dữ liệu hiện tại
+    df_with_features = create_features_func(current_df)
+    df_clean_features = df_with_features[feature_cols].ffill().fillna(0)
+    latest_features = df_clean_features.iloc[-1:].values
+    
+    # Dự báo từng ngày bằng model riêng
+    for day in range(1, days + 1):
+        scaler = scalers_dict[day]
+        model = models_dict[day]
         
+        # Chuẩn hóa và dự báo
         latest_features_scaled = scaler.transform(latest_features)
         pred_price = model.predict(latest_features_scaled)[0]
         
-        next_date = last_date + timedelta(days=i)
+        next_date = last_date + timedelta(days=day)
+        
         forecast_results.append({
             'Date': next_date,
-            'Price': pred_price
+            'Day': f'{day}D',
+            'Predicted_Price': pred_price
         })
-        
-        new_row = {
-            'Date': next_date,
-            'Price': pred_price,
-            'Open': pred_price,
-            'High': pred_price,
-            'Low': pred_price,
-            'Vol': last_vol
-        }
-        current_df = pd.concat([current_df, pd.DataFrame([new_row])], ignore_index=True)
-        
+    
     return pd.DataFrame(forecast_results)
