@@ -34,65 +34,108 @@ st.set_page_config(
 # Custom CSS
 st.markdown("""
 <style>
+    /* Global Font */
+    html, body, [class*="css"] {
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+    
+    /* Header */
     .main-header {
-        font-size: 3rem;
-        font-weight: bold;
-        background: linear-gradient(90deg, #00D9FF 0%, #FF6B6B 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-align: center;
+        font-size: 2.2rem;
+        font-weight: 600;
+        color: #f0f2f6;
+        text-align: left;
         padding: 1rem 0;
+        border-bottom: 1px solid #31333F;
+        margin-bottom: 2rem;
     }
+    
+    /* Metrics Cards */
     .metric-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background-color: #262730;
+        border: 1px solid #31333F;
         padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
         color: white;
     }
+    
+    /* Prediction Box (Professional Financial Card) */
     .prediction-box {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        background-color: #0e1117;
+        border: 1px solid #41444C;
         padding: 2rem;
-        border-radius: 15px;
+        border-radius: 6px;
         text-align: center;
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
         color: white;
     }
+    
+    /* Buttons - Minimalist Professional */
     .stButton>button {
-        background: linear-gradient(90deg, #00D9FF 0%, #4ECDC4 100%);
-        color: white;
-        font-weight: bold;
-        border: none;
-        padding: 0.5rem 2rem;
-        border-radius: 25px;
-        transition: all 0.3s;
+        background-color: #262730; /* Dark gray */
+        color: #ffffff;
+        border: 1px solid #41444C;
+        border-radius: 6px; /* Small radius */
+        padding: 0.5rem 1.5rem;
+        transition: all 0.2s;
+        font-weight: 500;
     }
+    
     .stButton>button:hover {
-        transform: scale(1.05);
-        box-shadow: 0 4px 12px rgba(0, 217, 255, 0.4);
+        border-color: #00D9FF; /* Highlight accent on hover */
+        background-color: #31333F;
+        color: #00D9FF;
+        transform: none; /* No scaling */
+        box-shadow: none;
+    }
+    
+    /* DataFrame Tables */
+    .stDataFrame {
+        border: 1px solid #31333F;
+        border-radius: 6px;
+    }
+    
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 24px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        white-space: pre-wrap;
+        background-color: transparent;
+        border-radius: 0;
+        color: #9da3af;
+        border-bottom: 2px solid transparent;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: transparent;
+        color: #00D9FF;
+        border-bottom: 2px solid #00D9FF;
     }
 </style>
 """, unsafe_allow_html=True)
 
-DISPLAY_DATA_PATH = './data/XRPUSDT_train.csv'
-SOURCE_DATA_PATH = './data/XRPUSDT20182024new.csv'
+# Helper to get absolute path
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+DISPLAY_DATA_PATH = os.path.join(BASE_DIR, 'data', 'XRPUSDT_train.csv')
+SOURCE_DATA_PATH = os.path.join(BASE_DIR, 'data', 'XRPUSDT20182024new.csv')
 
 # Layer 1 paths
-L1_MODEL_PATH = './models/layer1_rf_model.pkl'
-L1_SCALER_PATH = './models/layer1_scaler.pkl'
-L1_MULTI_MODELS_PATH = './models/layer1_multi_models.pkl'
-L1_MULTI_SCALERS_PATH = './models/layer1_multi_scalers.pkl'
-L1_SVR_MODEL_PATH = './models/layer1_svr_model.pkl'
-L1_SVR_SCALER_PATH = './models/layer1_svr_scaler.pkl'
+L1_MODEL_PATH = os.path.join(BASE_DIR, 'models', 'layer1_rf_model.pkl')
+L1_SCALER_PATH = os.path.join(BASE_DIR, 'models', 'layer1_scaler.pkl')
+L1_MULTI_MODELS_PATH = os.path.join(BASE_DIR, 'models', 'layer1_multi_models.pkl')
+L1_MULTI_SCALERS_PATH = os.path.join(BASE_DIR, 'models', 'layer1_multi_scalers.pkl')
+L1_SVR_MODEL_PATH = os.path.join(BASE_DIR, 'models', 'layer1_svr_model.pkl')
+L1_SVR_SCALER_PATH = os.path.join(BASE_DIR, 'models', 'layer1_svr_scaler.pkl')
 # Layer 2 paths
-L2_RIDGE_MODEL_PATH = './models/layer2_ridge_model.pkl'
-L2_RIDGE_SCALER_PATH = './models/layer2_ridge_scaler.pkl'
-L2_SVR_MODEL_PATH = './models/layer2_svr_model.pkl'
-L2_SVR_SCALER_PATH = './models/layer2_svr_scaler.pkl'
+L2_RIDGE_MODEL_PATH = os.path.join(BASE_DIR, 'models', 'layer2_ridge_model.pkl')
+L2_RIDGE_SCALER_PATH = os.path.join(BASE_DIR, 'models', 'layer2_ridge_scaler.pkl')
+L2_SVR_MODEL_PATH = os.path.join(BASE_DIR, 'models', 'layer2_svr_model.pkl')
+L2_SVR_SCALER_PATH = os.path.join(BASE_DIR, 'models', 'layer2_svr_scaler.pkl')
 # Layer 3 paths
-L3_MODEL_PATH = './models/layer3_lstm_model.keras'
-L3_SCALER_PATH = './models/layer3_scaler.pkl'
-L3_TARGET_SCALER_PATH = './models/layer3_target_scaler.pkl'
+L3_MODEL_PATH = os.path.join(BASE_DIR, 'models', 'layer3_lstm_model.keras')
+L3_SCALER_PATH = os.path.join(BASE_DIR, 'models', 'layer3_scaler.pkl')
+L3_TARGET_SCALER_PATH = os.path.join(BASE_DIR, 'models', 'layer3_target_scaler.pkl')
 
 # Session state initialization
 if 'model_trained' not in st.session_state:
@@ -119,6 +162,8 @@ if 'metrics' not in st.session_state:
     st.session_state.metrics = None
 if 'svr_metrics' not in st.session_state:
     st.session_state.svr_metrics = None
+if 'feature_cols' not in st.session_state:
+    st.session_state.feature_cols = None
 
 # Layer 2 Session States
 if 'l2_ridge_model_trained' not in st.session_state:
@@ -148,17 +193,16 @@ if 'l3_target_scaler' not in st.session_state:
 def main():
 
     # Header
-    st.markdown('<h1 class="main-header">DỰ BÁO GIÁ XRP - 3 LAYER HYBRID SYSTEM</h1>', unsafe_allow_html=True)
-    st.markdown("---")
+    st.markdown('<h1 class="main-header">XRP/USDT PRICE PREDICTION SYSTEM</h1>', unsafe_allow_html=True)
     
     # Sidebar
     with st.sidebar:
-        st.title("Phân tích Đa tầng")
-        st.info("""
-        **Hệ thống dự báo 3 lớp:**
-        1. **Layer 1 (ML)**: Định hướng xu hướng trung hạn (RandomForest).
-        2. **Layer 2 (Stat)**: Tinh chỉnh dự báo trong ngày (Ridge).
-        3. **Layer 3 (DL)**: Dự báo chuỗi thời gian 7 ngày (LSTM).
+        st.header("Control Panel")
+        st.markdown("""
+        **System Architecture:**
+        1. **Layer 1 (ML)**: Trend Direction (RandomForest, SVR)
+        2. **Layer 2 (Stat)**: Intraday Refinement (Ridge)
+        3. **Layer 3 (DL)**: Time-series Forecast (LSTM)
         """)
         
         if st.button("Tải & Xử lý dữ liệu thô"):
@@ -169,7 +213,7 @@ def main():
             st.write(f"Tổng số dòng: {len(st.session_state.df_features)}")
     
     # Tabs for different Layers
-    tab1, tab2, tab3 = st.tabs(["📊 Layer 1: Xu hướng", "🎯 Layer 2: Trong ngày", "🧠 Layer 3: Deep Learning"])
+    tab1, tab2, tab3 = st.tabs(["Layer 1: Trend", "Layer 2: Intraday", "Layer 3: Deep Learning"])
     
     with tab1:
         display_layer1_content()
@@ -185,46 +229,58 @@ def display_layer1_content():
     
     # Control buttons at top
     # Control buttons at top
-    st.subheader("Điều khiển mô hình Layer 1")
+    st.subheader("Layer 1 Model Control")
     
     col_up, col_cmd = st.columns([2, 1])
     with col_up:
-        uploaded_file = st.file_uploader("📂 Tải lên tệp CSV dữ liệu", type=['csv'], label_visibility="collapsed")
+        uploaded_file = st.file_uploader("Upload CSV Data", type=['csv'], label_visibility="collapsed")
         if uploaded_file is not None:
-            if st.button("🚀 Sử dụng tệp vừa tải lên", use_container_width=True):
+            if st.button("Use Validated File", use_container_width=True):
                 load_and_process_data(uploaded_file)
     
     with col_cmd:
-        if st.button("🔄 Lấy dữ liệu mặc định", use_container_width=True, help="Tải dữ liệu từ file train gốc"):
-            load_and_process_data()
+        if st.button("View Processed Data", use_container_width=True, help="Show full feature table"):
+            st.session_state.show_processed_data = not st.session_state.get('show_processed_data', False)
+    
+    # Hiển thị bảng dữ liệu đầy đủ nếu được yêu cầu
+    if st.session_state.get('show_processed_data', False):
+        if st.session_state.df_features is not None:
+            st.markdown("### Toàn bộ dữ liệu đã xử lý (Features)")
+            st.write("Bảng dưới đây bao gồm tất cả các chỉ số kỹ thuật đã được tính toán:")
+            st.dataframe(st.session_state.df_features, use_container_width=True)
+            if st.button("Đóng bảng dữ liệu"):
+                st.session_state.show_processed_data = False
+                st.rerun()
+        else:
+            st.warning("No data to display yet!")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    with st.expander("🛠️ Huấn luyện Mô hình Layer 1", expanded=True):
+    with st.expander("Model Training", expanded=True):
         train_col1, train_col2 = st.columns(2)
         with train_col1:
-            if st.button("🌲 Train RandomForest", use_container_width=True, disabled=st.session_state.df_features is None):
+            if st.button("Train RandomForest", use_container_width=True, disabled=st.session_state.df_features is None):
                 train_model(model_type="RF")
         with train_col2:
-            if st.button("📈 Train SVR", use_container_width=True, disabled=st.session_state.df_features is None):
+            if st.button("Train SVR", use_container_width=True, disabled=st.session_state.df_features is None):
                 train_model(model_type="SVR")
 
     st.markdown("<br>", unsafe_allow_html=True)
     
     col_p1, col_p2, col_p3, col_p4 = st.columns(4)
     with col_p1:
-        if st.button("📂 Load saved model", use_container_width=True):
+        if st.button("Load Saved Models", use_container_width=True):
             load_saved_model()
     with col_p2:
-        if st.button("🔮 Dự đoán 1 ngày", use_container_width=True, 
+        if st.button("Predict Next Day", use_container_width=True, 
                      disabled=not (st.session_state.model_trained or st.session_state.svr_model_trained)):
             make_prediction()
     with col_p3:
-        if st.button("📅 Dự đoán 7 ngày", use_container_width=True, 
+        if st.button("Predict 7 Days", use_container_width=True, 
                      disabled=not (st.session_state.model_trained or st.session_state.svr_model_trained)):
             make_7day_prediction()
     with col_p4:
-        if st.button("🗑️ Xóa model cũ", use_container_width=True):
+        if st.button("Delete Old Models", use_container_width=True):
             delete_old_models()
     
     st.markdown("---")
@@ -283,11 +339,16 @@ def train_model(model_type="RF"):
     with st.spinner(f"Đang huấn luyện mô hình {model_name}..."):
         try:
             # Get feature columns
-            # feature_cols = get_feature_columns()
+            # Lấy danh sách feature chuẩn (95 cột)
+            feature_cols = get_feature_columns()
+            st.session_state.feature_cols = feature_cols
+            
+            st.info(f"🛠️ Đang chuẩn bị dữ liệu với {len(feature_cols)} features...")
             
             # Prepare data
-            X_train, X_test, y_train, y_test, feature_cols = prepare_data_for_training(
+            X_train, X_test, y_train, y_test, _ = prepare_data_for_training(
                 st.session_state.df_features,
+                feature_columns=feature_cols,
                 target_column='Target_Price',
                 test_size=0.5
             )
@@ -354,38 +415,52 @@ def load_saved_model():
     """Load pre-trained models Layer 1 (RF & SVR)"""
     with st.spinner("Đang tải các mô hình Layer 1 đã lưu..."):
         try:
-            # Load RF
-            rf_model = load_model(L1_MODEL_PATH)
-            rf_scaler = load_model(L1_SCALER_PATH)
-            multi_models = load_model(L1_MULTI_MODELS_PATH)
-            multi_scalers = load_model(L1_MULTI_SCALERS_PATH)
-            
-            # Load SVR
-            svr_model = load_model(L1_SVR_MODEL_PATH)
-            svr_scaler = load_model(L1_SVR_SCALER_PATH)
-            
-            # Feature columns are shared
-            st.session_state.feature_cols = get_feature_columns()
+            # Feature columns are shared - lấy 1 lần để dùng chung
+            if st.session_state.feature_cols is None:
+                st.session_state.feature_cols = get_feature_columns()
             
             loaded_any = False
             
-            if rf_model and rf_scaler:
-                st.session_state.model = rf_model
-                st.session_state.scaler = rf_scaler
-                st.session_state.l1_multi_models = multi_models
-                st.session_state.l1_multi_scalers = multi_scalers
-                st.session_state.model_trained = True
-                loaded_any = True
-                st.info("✅ Đã tải mô hình RandomForest")
-                if multi_models is None:
-                    st.warning("⚠️ Không tìm thấy bộ 7 model RF (dự báo 7 ngày).")
-            
-            if svr_model and svr_scaler:
-                st.session_state.svr_model = svr_model
-                st.session_state.svr_scaler = svr_scaler
-                st.session_state.svr_model_trained = True
-                loaded_any = True
-                st.info("✅ Đã tải mô hình SVR")
+            # Load RF
+            try:
+                rf_model = load_model(L1_MODEL_PATH)
+                rf_scaler = load_model(L1_SCALER_PATH)
+                multi_models = load_model(L1_MULTI_MODELS_PATH)
+                multi_scalers = load_model(L1_MULTI_SCALERS_PATH)
+                
+                if rf_model and rf_scaler:
+                    if hasattr(rf_scaler, 'n_features_in_') and rf_scaler.n_features_in_ != len(st.session_state.feature_cols):
+                        st.error(f"⚠️ Scaler RF cũ ({rf_scaler.n_features_in_} cột) k khớp với code mới {len(st.session_state.feature_cols)}. Bỏ qua tải RF.")
+                        # Xóa file lỗi để tránh lặp lại
+                        if os.path.exists(L1_SCALER_PATH): os.remove(L1_SCALER_PATH)
+                    else:
+                        st.session_state.model = rf_model
+                        st.session_state.scaler = rf_scaler
+                        st.session_state.l1_multi_models = multi_models
+                        st.session_state.l1_multi_scalers = multi_scalers
+                        st.session_state.model_trained = True
+                        loaded_any = True
+                        st.info("✅ Đã tải mô hình RandomForest")
+            except Exception as e:
+                st.warning(f"Không thể tải RF: {e}")
+
+            # Load SVR
+            try:
+                svr_model = load_model(L1_SVR_MODEL_PATH)
+                svr_scaler = load_model(L1_SVR_SCALER_PATH)
+                
+                if svr_model and svr_scaler:
+                    if hasattr(svr_scaler, 'n_features_in_') and svr_scaler.n_features_in_ != len(st.session_state.feature_cols):
+                        st.error(f"⚠️ Scaler SVR cũ ({svr_scaler.n_features_in_} cột) k khớp code mới {len(st.session_state.feature_cols)}. Bỏ qua tải SVR.")
+                        if os.path.exists(L1_SVR_SCALER_PATH): os.remove(L1_SVR_SCALER_PATH)
+                    else:
+                        st.session_state.svr_model = svr_model
+                        st.session_state.svr_scaler = svr_scaler
+                        st.session_state.svr_model_trained = True
+                        loaded_any = True
+                        st.info("✅ Đã tải mô hình SVR")
+            except Exception as e:
+                st.warning(f"Không thể tải SVR: {e}")
             
             if not loaded_any:
                 st.warning("Không tìm thấy bất kỳ mô hình Layer 1 nào đã lưu.")
@@ -485,15 +560,29 @@ def make_prediction():
                 }
                 
             # Predict with SVR if available
+            # Predict with SVR if available
             if st.session_state.svr_model_trained:
-                svr_pred_scaled = st.session_state.svr_model.predict(
-                    st.session_state.svr_scaler.transform(latest_features)
-                )[0]
-                comparison_results['SVR'] = {
-                    'price': svr_pred_scaled,
-                    'lower': svr_pred_scaled * 0.98, # Theoretical interval
-                    'upper': svr_pred_scaled * 1.02
-                }
+                try:
+                    # Kiểm tra số features trước khi transform
+                    if hasattr(st.session_state.svr_scaler, 'n_features_in_'):
+                        expected = st.session_state.svr_scaler.n_features_in_
+                        actual = latest_features.shape[1]
+                        if expected != actual:
+                            raise ValueError(f"SVR Model cũ mong đợi {expected} features nhưng code mới cung cấp {actual}. Cần Train lại SVR!")
+
+                    svr_pred_scaled = st.session_state.svr_model.predict(
+                        st.session_state.svr_scaler.transform(latest_features)
+                    )[0]
+                    comparison_results['SVR'] = {
+                        'price': svr_pred_scaled,
+                        'lower': svr_pred_scaled * 0.98, # Theoretical interval
+                        'upper': svr_pred_scaled * 1.02
+                    }
+                except Exception as e:
+                    st.error(f"Lỗi SVR: {e}")
+                    st.warning("⚠️ Mô hình SVR hiện tại không tương thích với dữ liệu mới. Hệ thống sẽ bỏ qua SVR trong lần này. Vui lòng nhấn nút 'Train SVR' để huấn luyện lại!")
+                    # Tạm thời vô hiệu hóa SVR để không gây lỗi tiếp
+                    # st.session_state.svr_model_trained = False 
             
             st.session_state.prediction = {
                 'date': pred_date,
@@ -579,12 +668,19 @@ def make_7day_prediction():
             st.error(traceback.format_exc())
 
 
-def update_csv_with_prediction(prediction_val):
+def update_csv_with_prediction(prediction_val, col_name='RF_Pred_Tomorrow'):
     """Update the latest row in CSV with the prediction value"""
     try:
         df_csv = pd.read_csv(DISPLAY_DATA_PATH)
-        # Assuming Date is unique and sorted
-        df_csv.iloc[-1, df_csv.columns.get_loc('RF_Pred_Tomorrow')] = prediction_val
+        # Nếu cột chưa có thì tạo mới
+        if col_name not in df_csv.columns:
+            df_csv[col_name] = pd.NA
+            
+        # Assuming Date is unique and sorted -> update last row
+        # Xác định vị trí cột cẩn thận
+        col_idx = df_csv.columns.get_loc(col_name)
+        df_csv.iloc[-1, col_idx] = prediction_val
+        
         df_csv.to_csv(DISPLAY_DATA_PATH, index=False)
         return True
     except Exception as e:
@@ -605,37 +701,37 @@ def display_dashboard():
             pass
             
     # Latest data section - Only show latest date and single row
-    st.header("Dữ liệu mới nhất")
+    st.header("Latest Market Data")
     
     latest = get_latest_row(df)
     
     # Display latest date prominently
-    st.subheader(f"Ngày: {latest['Date'].strftime('%d/%m/%Y')}")
+    st.subheader(f"Date: {latest['Date'].strftime('%Y-%m-%d')}")
     
     # Metrics in one row
     col1, col2, col3, col4, col5 = st.columns(5)
     
     with col1:
         st.metric(
-            "Giá đóng cửa",
+            "Close",
             f"${format_number(latest['Price'])}",
             f"{format_number(latest['Return_1d'] if 'Return_1d' in latest else 0, 2)}%"
         )
     
     with col2:
-        st.metric("Giá mở cửa", f"${format_number(latest['Open'])}")
+        st.metric("Open", f"${format_number(latest['Open'])}")
     
     with col3:
-        st.metric("Giá cao nhất", f"${format_number(latest['High'])}")
+        st.metric("High", f"${format_number(latest['High'])}")
     
     with col4:
-        st.metric("Giá thấp nhất", f"${format_number(latest['Low'])}")
+        st.metric("Low", f"${format_number(latest['Low'])}")
     
     with col5:
-        st.metric("Khối lượng", f"{int(latest['Vol']):,}")
+        st.metric("Volume", f"{int(latest['Vol']):,}")
     
     # Show only the latest row in a clean table
-    st.subheader("Chi tiết dòng dữ liệu mới nhất")
+    st.subheader("Latest Data Detail")
     
     # Determine which columns to show as requested by user
     base_cols = ['Date', 'Price', 'Open', 'High', 'Low', 'Vol']
@@ -648,6 +744,8 @@ def display_dashboard():
             latest_row_df['RF_Pred_Tomorrow'] = last_display['RF_Pred_Tomorrow']
         if 'RF_Pred_Today' in df_display.columns:
             latest_row_df['RF_Pred_Today'] = last_display['RF_Pred_Today']
+            
+        # Thêm hiển thị cho SVR
         if 'SVR_Pred_Tomorrow' in df_display.columns:
             latest_row_df['SVR_Pred_Tomorrow'] = last_display['SVR_Pred_Tomorrow']
         if 'SVR_Pred_Today' in df_display.columns:
@@ -668,8 +766,21 @@ def display_dashboard():
     
     st.markdown("---")
 
-    # Hiển thị form nhập dữ liệu thủ công nếu được yêu cầu
-    if st.session_state.show_manual_input:
+    # Logic tự động hiển thị form nhập liệu:
+    # Nếu dữ liệu mới nhất đã có dự báo RF (Tomorrow & Today) -> Hiển thị form để nhập thực tế cho ngày tiếp theo
+    should_show_input = st.session_state.show_manual_input
+    
+    if df_display is not None and not df_display.empty:
+        last_display = df_display.iloc[-1]
+        has_rf_tomorrow = 'RF_Pred_Tomorrow' in last_display and pd.notna(last_display['RF_Pred_Tomorrow'])
+        has_rf_today = 'RF_Pred_Today' in last_display and pd.notna(last_display['RF_Pred_Today'])
+        
+        if has_rf_tomorrow and has_rf_today:
+            should_show_input = True
+            st.success("✅ Đã có dự báo đầy đủ. Mời nhập dữ liệu thực tế cho ngày tiếp theo bên dưới 👇")
+
+    # Hiển thị form nhập dữ liệu thủ công
+    if should_show_input:
         display_manual_input_form()
         st.markdown("---")
     
@@ -684,9 +795,9 @@ def display_dashboard():
         st.markdown("---")
     
     # Charts section
-    st.header("Phân tích giá")
+    st.header("Price Analysis")
     
-    tab1, tab2, tab3, tab4 = st.tabs(["Lịch sử giá", "Nến Nhật", "Khối lượng", "Chỉ số kỹ thuật"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Price History", "Candlestick", "Volume", "Technical Indicators"])
     
     with tab1:
         fig = plot_price_history(df, n_days=100)
@@ -759,59 +870,70 @@ def display_prediction_inline():
     pred = st.session_state.prediction
     results = pred['results']
     
-    st.header("Kết quả dự đoán so sánh")
+    st.header("Comparative Forecast Results")
     
     # Display cards for each model
     cols = st.columns(len(results))
     
     for i, (m_type, data) in enumerate(results.items()):
         with cols[i]:
-            bg_gradient = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" if m_type == "RF" else "linear-gradient(135deg, #02aab0 0%, #00cdac 100%)"
-            title = "🌲 RandomForest" if m_type == "RF" else "📈 SVR"
+            title = "RandomForest" if m_type == "RF" else "SVR (Support Vector Regression)"
             
             change = data['price'] - pred['current_price']
             change_pct = (change / pred['current_price']) * 100
-            color = "#00ff88" if change >= 0 else "#ff5555"
-            arrow = "↑" if change >= 0 else "↓"
+            
+            # Professional Financial Colors
+            color = "#00b894" if change >= 0 else "#ff7675" # Green/Red flat colors
+            arrow = "▲" if change >= 0 else "▼"
 
             st.markdown(f"""
-            <div style="background: {bg_gradient}; padding: 2rem; border-radius: 20px; text-align: center; color: white; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
-                <h3 style="margin-bottom: 0.5rem;">{title}</h3>
-                <p style="font-size: 0.9rem; opacity: 0.8;">{pred['date'].strftime('%d/%m/%Y')}</p>
-                <h1 style="font-size: 2.5rem; margin: 1rem 0;">${format_number(data['price'])}</h1>
-                <div style="background: rgba(255,255,255,0.1); padding: 0.5rem; border-radius: 10px;">
-                    <span style="color: {color}; font-weight: bold; font-size: 1.1rem;">{arrow} {format_number(abs(change_pct), 2)}%</span>
+            <div class="prediction-box">
+                <h3 style="color: #dfe6e9; margin-bottom: 0.5rem; font-weight: 500;">{title}</h3>
+                <p style="color: #b2bec3; font-size: 0.85rem;">target: {pred['date'].strftime('%Y-%m-%d')}</p>
+                <h1 style="font-size: 2.5rem; margin: 1rem 0; font-weight: 700;">${format_number(data['price'])}</h1>
+                <div style="margin-bottom: 1rem;">
+                    <span style="color: {color}; font-weight: 600; font-size: 1.2rem;">{arrow} {format_number(abs(change_pct), 2)}%</span>
                 </div>
-                <p style="margin-top: 1rem; font-size: 0.8rem; opacity: 0.7;">Khoảng tin cậy: ${format_number(data['lower'])} - ${format_number(data['upper'])}</p>
+                <div style="border-top: 1px solid #2d3436; padding-top: 0.8rem; margin-top: 0.8rem;">
+                    <p style="color: #636e72; font-size: 0.8rem; margin: 0;">Confidence Interval</p>
+                    <p style="color: #b2bec3; font-weight: 500;">${format_number(data['lower'])} - ${format_number(data['upper'])}</p>
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
-    # Save action if RF is available
-    if 'RF' in results:
-        st.markdown("<br>", unsafe_allow_html=True)
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            if st.button("Lưu dự đoán RF vào CSV", use_container_width=True):
-                save_prediction_to_csv()
+    st.markdown("<br>", unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    
+    # Save action for RF
+    with col1:
+        if 'RF' in results:
+            if st.button("Save RF Forecast to CSV", use_container_width=True):
+                save_prediction_to_csv(model_type='RF')
+
+    # Save action for SVR
+    with col2:
+        if 'SVR' in results:
+            if st.button("Save SVR Forecast to CSV", use_container_width=True):
+                save_prediction_to_csv(model_type='SVR')
 
 
 def display_7day_prediction_inline():
     """Display 7-day forecast results with table and chart"""
-    st.header("Dự đoán xu hướng 7 ngày")
+    st.header("7-Day Price Forecast")
     
     forecast_df = st.session_state.prediction_7days
     
     col1, col2 = st.columns([1, 2])
     
     with col1:
-        st.subheader("Bảng dự kiến")
+        st.subheader("Forecast Table")
         display_df = forecast_df.copy()
         display_df['Date'] = display_df['Date'].dt.strftime('%d/%m/%Y')
         display_df['Predicted_Price'] = display_df['Predicted_Price'].apply(lambda x: f"${x:.4f}")
         st.dataframe(display_df, use_container_width=True, hide_index=True)
     
     with col2:
-        st.subheader("Biểu đồ xu hướng")
+        st.subheader("Trend Chart")
         
         # Thêm giá hiện tại vào biểu đồ để thấy sự kết nối
         df_hist = st.session_state.df_features.tail(5)
@@ -847,13 +969,25 @@ def display_7day_prediction_inline():
         st.plotly_chart(fig, use_container_width=True)
 
 
-def save_prediction_to_csv():
+def save_prediction_to_csv(model_type='RF'):
     """Save prediction to CSV file"""
     if 'prediction' not in st.session_state:
         st.warning("Không có dự đoán để lưu!")
         return
     
     pred = st.session_state.prediction
+    results = pred['results']
+    
+    # Xác định giá trị và tên cột cần lưu dựa trên model_type
+    if model_type == 'RF':
+        if 'RF' not in results: return
+        pred_price = results['RF']['price']
+        target_col = 'RF_Pred_Tomorrow'
+    else:  # SVR
+        if 'SVR' not in results: return
+        pred_price = results['SVR']['price']
+        target_col = 'SVR_Pred_Tomorrow'
+
     is_new_prediction = pred.get('is_new_prediction', True)
     
     if is_new_prediction:
@@ -865,24 +999,26 @@ def save_prediction_to_csv():
         
         # If the prediction is indeed for the 'tomorrow' of the last existing row
         # we update that row's RF_Pred_Tomorrow column
-        success = update_csv_with_prediction(pred['predicted_price'])
+        success = update_csv_with_prediction(pred_price, col_name=target_col)
         
         if success:
-            st.success(f"Đã cập nhật dự đoán cho ngày {pred['date'].strftime('%d/%m/%Y')} vào dữ liệu hiện có!")
+            st.success(f"Đã cập nhật dự đoán {model_type} cho ngày {pred['date'].strftime('%d/%m/%Y')} vào dữ liệu hiện có!")
             load_and_process_data(target_path=DISPLAY_DATA_PATH) # Reload từ file vừa lưu
             st.rerun() # Làm mới giao diện ngay lập tức
         else:
             # Fallback to append if update fails or logic dictates
-            prediction_data = {
-                'Date': pred['date'],
-                'Price': pred['predicted_price'],
-                'Open': pred['predicted_price'],
-                'High': pred['upper_bound'],
-                'Low': pred['lower_bound'],
-                'Vol': 0
-            }
-            if append_prediction_to_csv(DISPLAY_DATA_PATH, prediction_data):
-                st.success("Đã thêm dòng dự đoán mới vào CSV!")
+            # Note: Chỉ append dòng mới nếu là RF (chính), SVR chỉ update
+            if model_type == 'RF':
+                prediction_data = {
+                    'Date': pred['date'],
+                    'Price': pred_price,
+                    'Open': pred_price,
+                    'High': results['RF']['upper'],
+                    'Low': results['RF']['lower'],
+                    'Vol': 0
+                }
+                if append_prediction_to_csv(DISPLAY_DATA_PATH, prediction_data):
+                    st.success("Đã thêm dòng dự đoán mới vào CSV!")
                 load_and_process_data(target_path=DISPLAY_DATA_PATH)
                 st.rerun()
             else:
