@@ -83,8 +83,10 @@ L1_MULTI_SCALERS_PATH = './models/layer1_multi_scalers.pkl'
 L1_SVR_MODEL_PATH = './models/layer1_svr_model.pkl'
 L1_SVR_SCALER_PATH = './models/layer1_svr_scaler.pkl'
 # Layer 2 paths
-L2_MODEL_PATH = './models/layer2_ridge_model.pkl'
-L2_SCALER_PATH = './models/layer2_scaler.pkl'
+L2_RIDGE_MODEL_PATH = './models/layer2_ridge_model.pkl'
+L2_RIDGE_SCALER_PATH = './models/layer2_ridge_scaler.pkl'
+L2_SVR_MODEL_PATH = './models/layer2_svr_model.pkl'
+L2_SVR_SCALER_PATH = './models/layer2_svr_scaler.pkl'
 # Layer 3 paths
 L3_MODEL_PATH = './models/layer3_lstm_model.keras'
 L3_SCALER_PATH = './models/layer3_scaler.pkl'
@@ -113,12 +115,19 @@ if 'show_manual_input' not in st.session_state:
     st.session_state.show_manual_input = False
 
 # Layer 2 Session States
-if 'l2_model_trained' not in st.session_state:
-    st.session_state.l2_model_trained = False
-if 'l2_model' not in st.session_state:
-    st.session_state.l2_model = None
-if 'l2_scaler' not in st.session_state:
-    st.session_state.l2_scaler = None
+if 'l2_ridge_model_trained' not in st.session_state:
+    st.session_state.l2_ridge_model_trained = False
+if 'l2_ridge_model' not in st.session_state:
+    st.session_state.l2_ridge_model = None
+if 'l2_ridge_scaler' not in st.session_state:
+    st.session_state.l2_ridge_scaler = None
+
+if 'l2_svr_model_trained' not in st.session_state:
+    st.session_state.l2_svr_model_trained = False
+if 'l2_svr_model' not in st.session_state:
+    st.session_state.l2_svr_model = None
+if 'l2_svr_scaler' not in st.session_state:
+    st.session_state.l2_svr_scaler = None
 
 # Layer 3 Session States
 if 'l3_model_trained' not in st.session_state:
@@ -173,35 +182,35 @@ def display_layer1_content():
     
     col1, col2 = st.columns([1, 3])
     with col1:
-        if st.button("🔄 Tải dữ liệu", use_container_width=True, type="primary"):
+        if st.button("🔄 Tải dữ liệu", width='stretch', type="primary"):
             load_and_process_data()
             
     with col2:
         with st.expander("🛠️ Huấn luyện Mô hình", expanded=True):
             train_col1, train_col2 = st.columns(2)
             with train_col1:
-                if st.button("🌲 Train RandomForest", use_container_width=True, disabled=st.session_state.df_features is None):
+                if st.button("🌲 Train RandomForest", width='stretch', disabled=st.session_state.df_features is None):
                     train_model(model_type="RF")
             with train_col2:
-                if st.button("📈 Train SVR", use_container_width=True, disabled=st.session_state.df_features is None):
+                if st.button("📈 Train SVR", width='stretch', disabled=st.session_state.df_features is None):
                     train_model(model_type="SVR")
 
     st.markdown("<br>", unsafe_allow_html=True)
     
     col_p1, col_p2, col_p3, col_p4 = st.columns(4)
     with col_p1:
-        if st.button("📂 Load saved model", use_container_width=True):
+        if st.button("📂 Load saved model", width='stretch'):
             load_saved_model()
     with col_p2:
-        if st.button("🔮 Dự đoán 1 ngày", use_container_width=True, 
+        if st.button("🔮 Dự đoán 1 ngày", width='stretch', 
                      disabled=not (st.session_state.model_trained or st.session_state.svr_model_trained)):
             make_prediction()
     with col_p3:
-        if st.button("📅 Dự đoán 7 ngày", use_container_width=True, 
+        if st.button("📅 Dự đoán 7 ngày", width='stretch', 
                      disabled=not (st.session_state.model_trained or st.session_state.svr_model_trained)):
             make_7day_prediction()
     with col_p4:
-        if st.button("🗑️ Xóa model cũ", use_container_width=True):
+        if st.button("🗑️ Xóa model cũ", width='stretch'):
             delete_old_models()
     
     st.markdown("---")
@@ -593,7 +602,7 @@ def display_dashboard():
     if 'Vol' in latest_row_df.columns:
         latest_row_df['Vol'] = latest_row_df['Vol'].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "N/A")
     
-    st.dataframe(latest_row_df, use_container_width=True, hide_index=True)
+    st.dataframe(latest_row_df, width='stretch', hide_index=True)
     
     st.markdown("---")
 
@@ -619,19 +628,19 @@ def display_dashboard():
     
     with tab1:
         fig = plot_price_history(df, n_days=100)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     with tab2:
         fig = plot_candlestick(df, n_days=60)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     with tab3:
         fig = plot_volume(df, n_days=60)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     with tab4:
         fig = plot_technical_indicators(df, n_days=60)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     # Model performance
     # Model performance comparison
@@ -660,7 +669,7 @@ def display_dashboard():
                     
                     if st.checkbox("Feature Importance (RF)", key="show_fi_rf"):
                         feature_imp = get_feature_importance(st.session_state.model, st.session_state.feature_cols, top_n=15)
-                        st.plotly_chart(plot_feature_importance(feature_imp), use_container_width=True)
+                        st.plotly_chart(plot_feature_importance(feature_imp), width='stretch')
                 tab_idx += 1
                 
             if st.session_state.svr_model_trained:
@@ -714,7 +723,7 @@ def display_prediction_inline():
         st.markdown("<br>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1, 1, 1])
         with col2:
-            if st.button("Lưu dự đoán RF vào CSV", use_container_width=True):
+            if st.button("Lưu dự đoán RF vào CSV", width='stretch'):
                 save_prediction_to_csv()
 
 
@@ -731,7 +740,7 @@ def display_7day_prediction_inline():
         display_df = forecast_df.copy()
         display_df['Date'] = display_df['Date'].dt.strftime('%d/%m/%Y')
         display_df['Predicted_Price'] = display_df['Predicted_Price'].apply(lambda x: f"${x:.4f}")
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
+        st.dataframe(display_df, width='stretch', hide_index=True)
     
     with col2:
         st.subheader("Biểu đồ xu hướng")
@@ -767,7 +776,7 @@ def display_7day_prediction_inline():
             yaxis_title="Giá XRP ($)"
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
 
 def save_prediction_to_csv():
@@ -840,7 +849,7 @@ def display_manual_input_form():
     # Hiển thị kết quả vừa dự đoán nếu có
     if 'last_manual_result' in st.session_state:
         st.markdown("#### Kết quả dự đoán cho dòng dữ liệu vừa nhập:")
-        st.dataframe(st.session_state.last_manual_result, use_container_width=True, hide_index=True)
+        st.dataframe(st.session_state.last_manual_result, width='stretch', hide_index=True)
 
 
 def handle_manual_input_submission(date, price, open_p, high, low, vol):
@@ -923,10 +932,10 @@ def display_layer2_content():
     # Train/Load buttons for L2
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("Train mô hình Layer 2", use_container_width=True, disabled=not st.session_state.model_trained):
+        if st.button("Train mô hình Layer 2", width='stretch', disabled=not st.session_state.model_trained):
             train_layer2_logic()
     with col2:
-        if st.button("Load Layer 2 model", use_container_width=True):
+        if st.button("Load Layer 2 model", width='stretch'):
             load_l2_model()
 
     st.markdown("---")
@@ -934,30 +943,36 @@ def display_layer2_content():
     # Prediction Section
     st.subheader("🔮 Dự đoán giá chốt phiên trực tuyến")
     
-    # 1. Get Base Prediction from Layer 1 for the TARGET day
+    # 1. Get Base Predictions from Layer 1 for the TARGET day
     latest_row = st.session_state.df_features.iloc[-1]
     last_date = latest_row['Date']
     target_date = get_next_trading_date(last_date)
     
-    # Check if we have a fresh prediction from session state or from the dataframe
-    base_pred_l1 = None
+    # Check if we have fresh predictions
+    l1_rf_target = None
+    l1_svr_target = None
     
-    # If RF_Pred_Tomorrow exists for the last row, that is our base prediction for target_date
+    # Try getting from row first
     if 'RF_Pred_Tomorrow' in latest_row and pd.notna(latest_row['RF_Pred_Tomorrow']):
-        base_pred_l1 = latest_row['RF_Pred_Tomorrow']
-    
-    # If not, check if user just hit "Make Prediction" in Layer 1 tab
-    if base_pred_l1 is None and 'prediction' in st.session_state:
-        # Check if the session prediction date matches our target date
+        l1_rf_target = latest_row['RF_Pred_Tomorrow']
+    if 'SVR_Pred_Tomorrow' in latest_row and pd.notna(latest_row['SVR_Pred_Tomorrow']):
+        l1_svr_target = latest_row['SVR_Pred_Tomorrow']
+        
+    # Overwrite/fill from session if user just clicked predict
+    if 'prediction' in st.session_state:
         if st.session_state.prediction['date'].date() == target_date.date():
-            base_pred_l1 = st.session_state.prediction['predicted_price']
+            results = st.session_state.prediction['results']
+            if 'RF' in results: l1_rf_target = results['RF']['price']
+            if 'SVR' in results: l1_svr_target = results['SVR']['price']
 
-    if base_pred_l1 is None:
-        st.warning(f"⚠️ Chưa có dự đoán Layer 1 cho ngày {target_date.strftime('%d/%m/%Y')}. Vui lòng qua Tab Layer 1 nhấn 'Dự đoán xu hướng' hoặc 'Train mô hình L1' trước.")
+    if l1_rf_target is None or l1_svr_target is None:
+        st.warning(f"⚠️ Chưa có đủ dự đoán Layer 1 (RF & SVR) cho ngày {target_date.strftime('%d/%m/%Y')}. Vui lòng qua Tab Layer 1 huấn luyện và dự đoán cả 2 mô hình trước.")
         return
 
     st.success(f"📅 Mục tiêu: Dự đoán giá Đóng cửa cho ngày **{target_date.strftime('%d/%m/%Y')}**")
-    st.info(f"💡 Dự đoán cơ sở (Layer 1): **${base_pred_l1:.4f}**")
+    col_l1a, col_l1b = st.columns(2)
+    col_l1a.info(f"💡 RF L1: **${l1_rf_target:.4f}**")
+    col_l1b.info(f"💡 SVR L1: **${l1_svr_target:.4f}**")
 
     # 2. User Input
     with st.form("layer2_form"):
@@ -975,39 +990,47 @@ def display_layer2_content():
     if submit:
         if any(v is None for v in [open_price, high_price, low_price, current_vol]):
             st.error("Vui lòng nhập đầy đủ giá Open, High, Low và Volume của ngày hôm nay!")
-        elif st.session_state.l2_model_trained:
+        elif not (st.session_state.l2_ridge_model_trained or st.session_state.l2_svr_model_trained):
+            st.error("Vui lòng train Layer 2 tại Tab này trước!")
+        else:
             try:
-                # Prepare L2 input: [Open, High, Low, Vol, RF_Pred_Today]
-                l2_input = np.array([[open_price, high_price, low_price, current_vol, base_pred_l1]])
-                final_pred = predict_layer2(st.session_state.l2_model, st.session_state.l2_scaler, l2_input)
+                # Prepare L2 input: [Open, High, Low, Vol, RF_Pred_Today, SVR_Pred_Today]
+                l2_input = np.array([[open_price, high_price, low_price, current_vol, l1_rf_target, l1_svr_target]])
                 
-                # Display Results
-                st.markdown(f"""
-                <div class="prediction-box">
-                    <h3 style="color: white; margin-bottom: 0px;">Dự đoán Layer 2 cho {target_date.strftime('%d/%m/%Y')}</h3>
-                    <h1 style="color: white; font-size: 4.5rem; margin-top: 10px;">${final_pred:.4f}</h1>
-                    <p style="color: white; font-size: 1.1rem;">(Đã tối ưu hóa dựa trên O-H-L-V)</p>
-                </div>
-                """, unsafe_allow_html=True)
+                res_col1, res_col2 = st.columns(2)
                 
-                # Analysis
-                diff = final_pred - base_pred_l1
-                diff_pct = (diff / base_pred_l1) * 100
-                st.write(f"Sự điều chỉnh của Layer 2 so với dự đoán kỹ thuật: **{'+' if diff > 0 else ''}{diff:.4f} ({diff_pct:.2f}%)**")
+                if st.session_state.l2_ridge_model_trained:
+                    pred_ridge = predict_layer2(st.session_state.l2_ridge_model, st.session_state.l2_ridge_scaler, l2_input)
+                    with res_col1:
+                        st.markdown(f"""
+                        <div class="prediction-box" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                            <h3 style="color: white; margin-bottom: 0px;">L2: Ridge (Thống kê)</h3>
+                            <h1 style="color: white; font-size: 3rem; margin-top: 10px;">${pred_ridge:.4f}</h1>
+                            <p style="color: white; font-size: 0.9rem;">(Dựa trên O-H-L-V & L1 Hybrid)</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                
+                if st.session_state.l2_svr_model_trained:
+                    pred_l2_svr = predict_layer2(st.session_state.l2_svr_model, st.session_state.l2_svr_scaler, l2_input)
+                    with res_col2:
+                        st.markdown(f"""
+                        <div class="prediction-box" style="background: linear-gradient(135deg, #FF512F 0%, #DD2476 100%);">
+                            <h3 style="color: white; margin-bottom: 0px;">L2: SVR (Máy học)</h3>
+                            <h1 style="color: white; font-size: 3rem; margin-top: 10px;">${pred_l2_svr:.4f}</h1>
+                            <p style="color: white; font-size: 0.9rem;">(Dựa trên O-H-L-V & L1 Hybrid)</p>
+                        </div>
+                        """, unsafe_allow_html=True)
                 
             except Exception as e:
                 st.error(f"Lỗi dự đoán L2: {e}")
-        else:
-            st.error("Vui lòng train Layer 2 tại Tab này trước!")
 
 def train_layer2_logic():
-    """Train Layer 2 Ridge Regression"""
+    """Train Layer 2 (Ridge & SVR) using both L1 predictions"""
     with st.spinner("Đang huấn luyện Layer 2..."):
         try:
             df = st.session_state.df_features.copy()
-            # Features are: Open, High, Low, Vol, RF_Pred_Today
-            # Target is: Price (actual close of that day)
-            l2_features = ['Open', 'High', 'Low', 'Vol', 'RF_Pred_Today']
+            # Features are: Open, High, Low, Vol, RF_Pred_Today, SVR_Pred_Today
+            l2_features = ['Open', 'High', 'Low', 'Vol', 'RF_Pred_Today', 'SVR_Pred_Today']
             target = 'Price'
             
             # Prepare data
@@ -1020,43 +1043,55 @@ def train_layer2_logic():
             X_train, X_test = X[:split_idx], X[split_idx:]
             y_train, y_test = y[:split_idx], y[split_idx:]
             
-            # Train
-            model, scaler = train_layer2_model(X_train, y_train)
+            # Train Ridge
+            ridge_model, ridge_scaler = train_layer2_model(X_train, y_train)
+            save_model(ridge_model, L2_RIDGE_MODEL_PATH)
+            save_model(ridge_scaler, L2_RIDGE_SCALER_PATH)
             
-            # Evaluate
-            X_test_scaled = scaler.transform(X_test)
-            y_pred = model.predict(X_test_scaled)
-            mae = mean_absolute_error(y_test, y_pred)
+            # Train SVR for L2
+            svr_model, svr_scaler = train_svr_model(X_train, y_train)
+            save_model(svr_model, L2_SVR_MODEL_PATH)
+            save_model(svr_scaler, L2_SVR_SCALER_PATH)
             
-            # Save
-            save_model(model, L2_MODEL_PATH)
-            save_model(scaler, L2_SCALER_PATH)
+            st.session_state.l2_ridge_model = ridge_model
+            st.session_state.l2_ridge_scaler = ridge_scaler
+            st.session_state.l2_ridge_model_trained = True
             
-            st.session_state.l2_model = model
-            st.session_state.l2_scaler = scaler
-            st.session_state.l2_model_trained = True
+            st.session_state.l2_svr_model = svr_model
+            st.session_state.l2_svr_scaler = svr_scaler
+            st.session_state.l2_svr_model_trained = True
             
-            st.success(f"Đã train Layer 2 thành công! MAE: {mae:.6f}")
+            st.success(f"Đã train Layer 2 (Ridge & SVR) thành công!")
             
         except Exception as e:
             st.error(f"Lỗi khi train L2: {e}")
 
 
 def load_l2_model():
-    """Load Layer 2 model"""
-    with st.spinner("Đang load Layer 2..."):
+    """Load Layer 2 models"""
+    with st.spinner("Đang tải các mô hình Layer 2..."):
         try:
-            model = load_model(L2_MODEL_PATH)
-            scaler = load_model(L2_SCALER_PATH)
-            if model and scaler:
-                st.session_state.l2_model = model
-                st.session_state.l2_scaler = scaler
-                st.session_state.l2_model_trained = True
-                st.success("Đã load Layer 2 thành công!")
-            else:
-                st.warning("Không tìm thấy tệp mô hình Layer 2.")
+            # Load Ridge
+            ridge_model = load_model(L2_RIDGE_MODEL_PATH)
+            ridge_scaler = load_model(L2_RIDGE_SCALER_PATH)
+            if ridge_model and ridge_scaler:
+                st.session_state.l2_ridge_model = ridge_model
+                st.session_state.l2_ridge_scaler = ridge_scaler
+                st.session_state.l2_ridge_model_trained = True
+                st.info("✅ Đã tải mô hình L2 Ridge")
+                
+            # Load SVR
+            svr_model = load_model(L2_SVR_MODEL_PATH)
+            svr_scaler = load_model(L2_SVR_SCALER_PATH)
+            if svr_model and svr_scaler:
+                st.session_state.l2_svr_model = svr_model
+                st.session_state.l2_svr_scaler = svr_scaler
+                st.session_state.l2_svr_model_trained = True
+                st.info("✅ Đã tải mô hình L2 SVR")
+                
+            st.success("Tải mô hình Layer 2 hoàn tất!")
         except Exception as e:
-            st.error(f"Lỗi: {e}")
+            st.error(f"Lỗi khi load L2 models: {e}")
 
 
 def display_layer3_content():
@@ -1075,16 +1110,16 @@ def display_layer3_content():
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        if st.button("Xử lý dữ liệu L3", use_container_width=True):
+        if st.button("Xử lý dữ liệu L3", width='stretch'):
             prepare_l3_features()
     with col2:
-        if st.button("Train mô hình L3", use_container_width=True):
+        if st.button("Train mô hình L3", width='stretch'):
             train_l3_model()
     with col3:
-        if st.button("Load L3 model", use_container_width=True):
+        if st.button("Load L3 model", width='stretch'):
             load_l3_model()
     with col4:
-        if st.button("Dự báo LSTM (7 ngày)", use_container_width=True, disabled=not st.session_state.l3_model_trained):
+        if st.button("Dự báo LSTM (7 ngày)", width='stretch', disabled=not st.session_state.l3_model_trained):
             make_l3_prediction()
 
     st.markdown("---")
@@ -1301,7 +1336,7 @@ def display_l3_prediction_results():
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
 
 if __name__ == "__main__":
