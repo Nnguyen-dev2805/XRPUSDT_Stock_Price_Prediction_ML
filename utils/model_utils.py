@@ -2,12 +2,75 @@ import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
-from sklearn.preprocessing import StandardScaler, RobustScaler
+from sklearn.preprocessing import StandardScaler, RobustScaler, MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import pickle
 import os
 from datetime import timedelta
 
+# Lazy import for tensorflow to avoid unnecessary load if not using LSTM
+def get_lstm_model(input_shape, forecast_steps=7, units=64, dropout=0.2, lr=0.001):
+    from tensorflow.keras.models import Sequential
+    from tensorflow.keras.layers import LSTM, Dense, Dropout
+    from tensorflow.keras.optimizers import Adam
+    
+    model = Sequential([
+        LSTM(units, return_sequences=True, input_shape=input_shape),
+        Dropout(dropout),
+        LSTM(units // 2),
+        Dropout(dropout),
+        Dense(forecast_steps)
+    ])
+    
+    model.compile(optimizer=Adam(learning_rate=lr), loss='mean_squared_error')
+    return model
+
+def prepare_lstm_data(df, feature_cols, lookback=30, forecast=7):
+    """
+    Chuẩn bị dữ liệu chuỗi thời gian cho LSTM
+    """
+    from sklearn.preprocessing import MinMaxScaler
+    
+    # Scale features
+    scaler = MinMaxScaler()
+    scaled_data = scaler.fit_transform(df[feature_cols])
+    
+    # Scale target (Price) separately for inverse transformation
+    target_scaler = MinMaxScaler()
+    target_scaler.fit(df[['Price']])
+    
+    X, y = [], []
+    price_idx = feature_cols.index('Price')
+    
+    for i in range(lookback, len(scaled_data) - forecast + 1):
+        X.append(scaled_data[i-lookback:i])
+        y.append(scaled_data[i:i+forecast, price_idx])
+        
+    return np.array(X), np.array(y), scaler, target_scaler
+
+def train_lstm_model(X_train, y_train, epochs=50, batch_size=32):
+    """
+    Huấn luyện mô hình LSTM
+    """
+    input_shape = (X_train.shape[1], X_train.shape[2])
+    model = get_lstm_model(input_shape)
+    
+    from tensorflow.keras.callbacks import EarlyStopping
+    early_stop = EarlyStopping(monitor='loss', patience=5, restore_best_weights=True)
+    
+    model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, verbose=0, callbacks=[early_stop])
+    
+    return model
+
+def predict_lstm(model, last_sequence):
+    """
+    Dự báo bằng LSTM
+    """
+    if len(last_sequence.shape) == 2:
+        last_sequence = last_sequence.reshape(1, last_sequence.shape[0], last_sequence.shape[1])
+        
+    prediction = model.predict(last_sequence, verbose=0)
+    return prediction[0]
 
 # train model
 def train_layer1_model(X_train, y_train, params=None):

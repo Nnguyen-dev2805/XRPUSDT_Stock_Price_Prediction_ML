@@ -120,6 +120,29 @@ def create_advanced_features(data):
     return feature_data
 
 
+def create_lstm_features(data):
+    """
+    Tạo các features chuyên biệt cho mô hình LSTM
+    Dựa trên notebook LSTM_Price_Forecast_Pipeline.ipynb
+    """
+    df = data.copy()
+    EPS = 1e-8
+    
+    # Feature Engineering: VVR, VWAP, Lag Features
+    df['VVR'] = df['Vol'] / (df['High'] - df['Low'] + EPS)
+    df['VWAP'] = ((df['High'] + df['Low'] + df['Price']) / 3 * df['Vol']).cumsum() / df['Vol'].cumsum()
+    
+    for lag in [1, 2, 3, 5, 7]:
+        df[f'Lag_{lag}'] = df['Price'].shift(lag)
+        
+    df['Price_Change'] = df['Price'].pct_change()
+    df['Volatility'] = df['High'] - df['Low']
+    df['MA5'] = df['Price'].rolling(5).mean()
+    df['MA10'] = df['Price'].rolling(10).mean()
+    
+    return df
+
+
 def get_feature_columns():
     """
     Trả về danh sách các feature columns để train model
