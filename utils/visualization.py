@@ -279,3 +279,75 @@ def plot_feature_importance(feature_importance_df, top_n=15):
     )
     
     return fig
+
+
+def plot_prediction_30d(df, predictions, target_date):
+    """
+    Vẽ biểu đồ 30 ngày lịch sử và điểm dự báo T+1
+    
+    Args:
+        df: DataFrame chứa dữ liệu lịch sử
+        predictions: Dictionary các dự báo (e.g., {'RF': {'price': ...}, 'SVR': {...}})
+        target_date: Ngày mục tiêu dự báo
+    
+    Returns:
+        Plotly figure
+    """
+    # Lấy 30 ngày cuối
+    df_plot = df.tail(30).copy()
+    
+    fig = go.Figure()
+    
+    # 1. Historical Data (Green/Cyan line)
+    fig.add_trace(go.Scatter(
+        x=df_plot['Date'],
+        y=df_plot['Price'],
+        mode='lines+markers',
+        name='Lịch sử (30 ngày)',
+        line=dict(color='#00D9FF', width=3),
+        marker=dict(size=6)
+    ))
+    
+    # 2. Add Predictions (Red points)
+    colors_pred = ['#FF4B4B', '#FF7675'] # Shades of red
+    for i, (m_type, data) in enumerate(predictions.items()):
+        name = f"Dự báo {m_type} (T+1)"
+        fig.add_trace(go.Scatter(
+            x=[target_date],
+            y=[data['price']],
+            mode='markers+text',
+            name=name,
+            marker=dict(color=colors_pred[i % len(colors_pred)], size=12, symbol='star'),
+            text=[f"${data['price']:.4f}"],
+            textposition="top center"
+        ))
+        
+        # Add a connecting dashed line from last point to prediction
+        last_date = df_plot['Date'].iloc[-1]
+        last_price = df_plot['Price'].iloc[-1]
+        fig.add_trace(go.Scatter(
+            x=[last_date, target_date],
+            y=[last_price, data['price']],
+            mode='lines',
+            name=f'Trend {m_type}',
+            line=dict(color=colors_pred[i % len(colors_pred)], width=2, dash='dot'),
+            showlegend=False
+        ))
+
+    fig.update_layout(
+        title=dict(
+            text=f'Bối cảnh Thị trường & Dự đoán Ngày {target_date.strftime("%d/%m/%Y")}',
+            x=0.5,
+            xanchor='center'
+        ),
+        xaxis_title='Ngày',
+        yaxis_title='Giá XRP (USDT)',
+        template='plotly_dark',
+        hovermode='x unified',
+        height=450,
+        margin=dict(l=20, r=20, t=60, b=20),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    
+    return fig
+

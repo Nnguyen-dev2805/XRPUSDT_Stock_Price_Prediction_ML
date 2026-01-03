@@ -37,7 +37,8 @@ from .visualization import (
     plot_volume,
     plot_technical_indicators,
     plot_prediction_result,
-    plot_feature_importance
+    plot_feature_importance,
+    plot_prediction_30d
 )
 
 __all__ = [
@@ -73,5 +74,6 @@ __all__ = [
     'plot_volume',
     'plot_technical_indicators',
     'plot_prediction_result',
-    'plot_feature_importance'
+    'plot_feature_importance',
+    'plot_prediction_30d'
 ]
