@@ -18,7 +18,7 @@ def create_advanced_features(data):
     feature_data['OC_Range_Pct'] = (feature_data['OC_Range'] / feature_data['Open']) * 100
     
     # Price position
-    feature_data['Price_Position'] = (feature_data['Price'] - feature_data['Low']) / feature_data['HL_Range']
+    feature_data['Price_Position'] = (feature_data['Price'] - feature_data['Low']) / (feature_data['HL_Range'] + 1e-8)
     
     # ==================== MOVING AVERAGES ====================
     for period in [5, 7, 10, 14, 20, 30]:
@@ -37,7 +37,7 @@ def create_advanced_features(data):
         feature_data[f'BB_Upper_{period}'] = bb_middle + (2 * bb_std)
         feature_data[f'BB_Lower_{period}'] = bb_middle - (2 * bb_std)
         feature_data[f'BB_Width_{period}'] = feature_data[f'BB_Upper_{period}'] - feature_data[f'BB_Lower_{period}']
-        feature_data[f'BB_Position_{period}'] = (feature_data['Price'] - feature_data[f'BB_Lower_{period}']) / feature_data[f'BB_Width_{period}']
+        feature_data[f'BB_Position_{period}'] = (feature_data['Price'] - feature_data[f'BB_Lower_{period}']) / (feature_data[f'BB_Width_{period}'] + 1e-8)
     
     # ==================== MOMENTUM INDICATORS ====================
     # RSI
@@ -52,7 +52,7 @@ def create_advanced_features(data):
     for period in [14]:
         low_min = feature_data['Low'].rolling(window=period).min()
         high_max = feature_data['High'].rolling(window=period).max()
-        feature_data[f'Stoch_{period}'] = 100 * (feature_data['Price'] - low_min) / (high_max - low_min)
+        feature_data[f'Stoch_{period}'] = 100 * (feature_data['Price'] - low_min) / (high_max - low_min + 1e-8)
     
     # ROC
     for period in [5, 10]:
@@ -75,7 +75,7 @@ def create_advanced_features(data):
     
     for period in [5, 10, 20]:
         feature_data[f'Vol_SMA_{period}'] = feature_data['Vol'].rolling(window=period).mean()
-        feature_data[f'Vol_Ratio_{period}'] = feature_data['Vol'] / feature_data[f'Vol_SMA_{period}']
+        feature_data[f'Vol_Ratio_{period}'] = feature_data['Vol'] / (feature_data[f'Vol_SMA_{period}'] + 1e-8)
     
     feature_data['Vol_Price_Corr_20'] = feature_data['Vol'].rolling(window=20).corr(feature_data['Price'])
     

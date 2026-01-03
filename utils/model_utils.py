@@ -218,8 +218,8 @@ def prepare_data_for_training(df_features, feature_columns=None, target_column='
     feature_columns = [col for col in feature_columns if col in df_clean.columns]
     
     # Quan trọng: Sau khi xác định feature_columns, ta cần dropna một lần nữa trên các feature này
-    # để đảm bảo mô hình không gặp NaN khi train
-    df_clean = df_clean.dropna(subset=feature_columns)
+    # để đảm bảo mô hình không gặp NaN hoặc Infinity khi train
+    df_clean = df_clean.replace([np.inf, -np.inf], np.nan).dropna(subset=feature_columns)
     
     X = df_clean[feature_columns]
     y = df_clean[target_column]
@@ -339,8 +339,8 @@ def train_multi_horizon_models(df_features, feature_columns, days=7):
         
         target_col = f'Target_Price_{day}D'
         
-        # Drop NaN
-        df_clean = df_sorted.dropna(subset=feature_columns + [target_col])
+        # Drop NaN and Infinity
+        df_clean = df_sorted.replace([np.inf, -np.inf], np.nan).dropna(subset=feature_columns + [target_col])
         
         X = df_clean[feature_columns]
         y = df_clean[target_col]
@@ -433,7 +433,7 @@ def predict_multi_step_layer1(models_dict, scalers_dict, df_initial, feature_col
     
     # Tạo features từ dữ liệu hiện tại
     df_with_features = create_features_func(current_df)
-    df_clean_features = df_with_features[feature_cols].ffill().fillna(0)
+    df_clean_features = df_with_features[feature_cols].copy().replace([np.inf, -np.inf], np.nan).ffill().fillna(0)
     latest_features = df_clean_features.iloc[-1:].values
     
     # Dự báo từng ngày bằng model riêng
