@@ -1969,7 +1969,7 @@ def display_ml_ensemble_tab():
             
             col_ens_btn1, col_ens_btn2 = st.columns(2)
             with col_ens_btn1:
-                # Resolve data source - Independent from Layer 1
+                # Resolve data source (Independent only)
                 data_ready = 'df_ensemble_raw' in st.session_state
 
                 if st.button("Xử lý Features", type="primary", use_container_width=True, key="btn_ens_process", disabled=not data_ready):
@@ -1990,7 +1990,7 @@ def display_ml_ensemble_tab():
             
             col_e_train1, col_e_train2 = st.columns(2)
             with col_e_train1:
-                if st.button("Train Ensemble", type="primary", use_container_width=True, key="btn_ens_train", disabled='df_ensemble' not in st.session_state and st.session_state.df_features is None):
+                if st.button("Train Ensemble", type="primary", use_container_width=True, key="btn_ens_train", disabled='df_ensemble' not in st.session_state):
                     train_ml_ensemble_model()
             with col_e_train2:
                 if st.button("Tải model từ disk", use_container_width=True, key="btn_ens_load"):
@@ -2012,7 +2012,7 @@ def display_ml_ensemble_tab():
         if st.session_state.ml_ensemble_metrics is not None:
              display_ml_ensemble_results()
     else:
-        st.info("Sử dụng dữ liệu chung hoặc tải file riêng để huấn luyện mô hình Ensemble.")
+        st.info("💡 Vui lòng tải file CSV riêng trong Tab này để huấn luyện mô hình Ensemble.")
     
     st.divider()
     
@@ -2029,11 +2029,11 @@ def train_regime_lstm_model(epochs=60, lr=0.001):
     """Train Regime LSTM model"""
     with st.spinner(f"Đang training Regime LSTM ({epochs} epochs)..."):
         try:
-            # Chỉ sử dụng dữ liệu riêng của Regime Tab
+            # Lấy dữ liệu riêng của Regime Tab
             if 'df_regime' in st.session_state and st.session_state.df_regime is not None:
                 df = st.session_state.df_regime.copy()
             else:
-                st.error("Không tìm thấy dữ liệu cho Regime LSTM! Vui lòng tải file CSV và xử lý features ở trên.")
+                st.error("Không tìm thấy dữ liệu cho Regime LSTM! Vui lòng tải file CSV ở Bước 1 (trong Tab này).")
                 return
             
             # Ensure required columns
@@ -2086,11 +2086,11 @@ def train_ml_ensemble_model():
     """Train ML Ensemble model"""
     with st.spinner("Đang training ML Ensemble..."):
         try:
-            # Chỉ sử dụng dữ liệu riêng của Ensemble Tab
+            # Lấy dữ liệu riêng của Ensemble Tab
             if 'df_ensemble' in st.session_state and st.session_state.df_ensemble is not None:
                 df = st.session_state.df_ensemble.copy()
             else:
-                st.error("Không tìm thấy dữ liệu cho ML Ensemble! Vui lòng tải file CSV và xử lý features ở trên.")
+                st.error("Không tìm thấy dữ liệu cho ML Ensemble! Vui lòng tải file CSV ở Bước 1 (trong Tab này).")
                 return
 
             df.to_csv("df_features_export.csv", index=False)
@@ -2173,12 +2173,10 @@ def make_regime_lstm_prediction():
     with st.spinner("Đang dự báo với Regime LSTM..."):
         try:
             # Ưu tiên dữ liệu riêng
-            # Chỉ sử dụng dữ liệu riêng
             if 'df_regime' in st.session_state and st.session_state.df_regime is not None:
                 df = st.session_state.df_regime.copy()
             else:
-                st.error("Thiếu dữ liệu đã xử lý cho Regime LSTM.")
-                return
+                df = st.session_state.df_features.copy()
                 
             # Đảm bảo sắp xếp thời gian
             if 'Date' in df.columns:
@@ -2223,12 +2221,10 @@ def make_ml_ensemble_prediction():
     with st.spinner("Đang dự báo với ML Ensemble..."):
         try:
             # Ưu tiên dữ liệu riêng
-            # Chỉ sử dụng dữ liệu riêng
             if 'df_ensemble' in st.session_state and st.session_state.df_ensemble is not None:
                 df = st.session_state.df_ensemble.copy()
             else:
-                st.error("Thiếu dữ liệu đã xử lý cho ML Ensemble.")
-                return
+                df = st.session_state.df_features.copy()
             
             # Đảm bảo sắp xếp thời gian
             if 'Date' in df.columns:
