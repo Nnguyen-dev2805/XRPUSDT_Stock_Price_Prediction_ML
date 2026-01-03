@@ -1,8 +1,3 @@
-"""
-ML Ensemble Forecaster implementation based on StackingMLTraditional.ipynb
-Ensemble của RandomForest + GradientBoosting + Ridge với cấu trúc sequence
-"""
-
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
@@ -15,42 +10,27 @@ warnings.filterwarnings("ignore")
 EPS = 1e-8
 RANDOM_STATE = 42
 
-
-# ==============================================
-# FEATURE ENGINEERING
-# ==============================================
-
 def create_ml_features(df):
-    """
-    Create features for ML Ensemble (lighter than full advanced features)
-    Based on StackingMLTraditional.ipynb
-    
-    Args:
-        df: DataFrame with columns [Date, Open, High, Low, Price/Close, Vol/Volume]
-        
-    Returns:
-        DataFrame with additional features
-    """
     df = df.copy()
     
-    # Standardize column names
-    if 'Price' in df.columns:
-        df.rename(columns={'Price': 'Close'}, inplace=True)
-    if 'Vol' in df.columns:
-        df.rename(columns={'Vol': 'Volume'}, inplace=True)
+    # Đảm bảo có các cột cơ bản (không rename nữa, dùng trực tiếp Price/Vol)
+    if 'Close' in df.columns and 'Price' not in df.columns:
+        df.rename(columns={'Close': 'Price'}, inplace=True)
+    if 'Volume' in df.columns and 'Vol' not in df.columns:
+        df.rename(columns={'Volume': 'Vol'}, inplace=True)
     
     # Return and ranges
-    df['Return_1d'] = df['Close'].pct_change()
+    df['Return_1d'] = df['Price'].pct_change()
     df['HL_Range'] = df['High'] - df['Low']
-    df['OC_Range'] = abs(df['Open'] - df['Close'])
+    df['OC_Range'] = abs(df['Open'] - df['Price'])
     
-    # Simple Moving Averages
+    # Simple Moving Averages và Price Ratios
     for p in [5, 10, 20]:
-        df[f'SMA_{p}'] = df['Close'].rolling(p).mean()
-        df[f'Price_SMA_{p}'] = df['Close'] / (df[f'SMA_{p}'] + EPS) - 1
+        df[f'SMA_{p}'] = df['Price'].rolling(p).mean()
+        df[f'Price_SMA_{p}'] = df['Price'] / (df[f'SMA_{p}'] + EPS) - 1
     
     # RSI (14-period)
-    delta = df['Close'].diff()
+    delta = df['Price'].diff()
     gain = delta.clip(lower=0).rolling(14).mean()
     loss = -delta.clip(upper=0).rolling(14).mean()
     rs = gain / (loss + EPS)
@@ -70,10 +50,6 @@ def create_ml_features(df):
 # ==============================================
 
 class MLEnsembleForecaster:
-    """
-    ML-based sequence forecaster using ensemble of traditional models
-    Mimics LSTM structure but uses flattened sequences
-    """
     
     def __init__(self, lookback=30, horizon=7, train_ratio=0.4):
         """
@@ -88,20 +64,19 @@ class MLEnsembleForecaster:
         self.horizon = horizon
         self.train_ratio = train_ratio
         
-        # Models
+        # Models with exact parameters from notebook
         self.models = {
             'RF': RandomForestRegressor(
-                n_estimators=400,
-                max_depth=12,
-                min_samples_leaf=5,
-                n_jobs=-1,
-                random_state=RANDOM_STATE
+                n_estimators=400, 
+                max_depth=12, 
+                min_samples_leaf=5, 
+                random_state=42
             ),
             'GB': GradientBoostingRegressor(
-                n_estimators=300,
-                max_depth=4,
-                learning_rate=0.05,
-                random_state=RANDOM_STATE
+                n_estimators=300, 
+                max_depth=4, 
+                learning_rate=0.05, 
+                random_state=42
             ),
             'Ridge': Ridge(alpha=1.0)
         }
@@ -122,21 +97,24 @@ class MLEnsembleForecaster:
         self.is_trained = False
     
     def prepare_data(self, df):
-        """
-        Prepare data with sequence structure similar to LSTM
+        if 'RSI_14' not in df.columns:
+            df_features = create_ml_features(df)
+        else:
+            df_features = df.copy()
         
-        Args:
-            df: Input DataFrame
-            
-        Returns:
-            X_train, X_test, y_train, y_test
-        """
-        # Create ML features
-        df_features = create_ml_features(df)
+        self.feature_cols = [
+            'Price', 'Open', 'High', 'Low', 'Vol',
+            'Return_1d', 'HL_Range', 'OC_Range', 
+            'SMA_5', 'Price_SMA_5', 'SMA_10', 'Price_SMA_10', 'SMA_20', 'Price_SMA_20',
+            'RSI_14', 'Volatility_20'
+        ]
         
-        # Get feature columns (exclude Date)
-        self.feature_cols = [c for c in df_features.columns if c not in ['Date']]
-        target_col = 'Close'
+        # Kiểm tra xem df có đủ cột không, nếu thiếu thì mới tạo
+        for col in self.feature_cols:
+            if col not in df_features.columns:
+                df_features = create_ml_features(df)
+                break
+        target_col = 'Price'
         target_idx = self.feature_cols.index(target_col)
         
         # Scale data
@@ -169,16 +147,6 @@ class MLEnsembleForecaster:
         return X_train, X_test, y_train, y_test
     
     def train(self, X_train, y_train):
-        """
-        Train all ensemble models
-        
-        Args:
-            X_train: Training features
-            y_train: Training targets
-            
-        Returns:
-            metrics: Dictionary with training metrics
-        """
         metrics = {}
         
         print("\nTraining ML Ensemble models...")
@@ -195,15 +163,6 @@ class MLEnsembleForecaster:
         return metrics
     
     def predict(self, X_test):
-        """
-        Make ensemble predictions
-        
-        Args:
-            X_test: Test features
-            
-        Returns:
-            predictions: Weighted ensemble predictions
-        """
         if not self.is_trained:
             raise ValueError("Models not trained yet. Call train() first.")
         
@@ -267,8 +226,11 @@ class MLEnsembleForecaster:
         if not self.is_trained:
             raise ValueError("Models not trained yet.")
         
-        # Create features
-        df_features = create_ml_features(df_latest)
+        # Create features only if not already present
+        if 'RSI_14' not in df_latest.columns:
+            df_features = create_ml_features(df_latest)
+        else:
+            df_features = df_latest.copy()
         
         # Get last lookback rows
         X_raw = df_features[self.feature_cols].iloc[-self.lookback:].values
@@ -293,20 +255,6 @@ class MLEnsembleForecaster:
 # ==============================================
 
 def train_ml_ensemble(df, lookback=30, horizon=7, train_ratio=0.4, verbose=True):
-    """
-    Train ML Ensemble forecaster
-    
-    Args:
-        df: Input DataFrame
-        lookback: Sequence length
-        horizon: Forecast horizon
-        train_ratio: Train split ratio
-        verbose: Print progress
-        
-    Returns:
-        ensemble: Trained MLEnsembleForecaster
-        metrics: Evaluation metrics
-    """
     # Initialize
     ensemble = MLEnsembleForecaster(
         lookback=lookback,

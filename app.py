@@ -6,6 +6,7 @@ import os
 import sys
 from sklearn.metrics import mean_absolute_error
 import plotly.graph_objects as go
+import traceback
 
 sys.path.append(os.path.dirname(__file__))
 
@@ -29,7 +30,7 @@ from utils.regime_lstm import (
     train_regime_lstm, predict_regime_lstm
 )
 from utils.ml_ensemble import (
-    MLEnsembleForecaster, train_ml_ensemble
+    MLEnsembleForecaster, train_ml_ensemble, create_ml_features
 )
 
 # Page config
@@ -82,6 +83,17 @@ st.markdown("""
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
 
+    /* Primary buttons styling (Force Red) */
+    .stButton > button[kind="primary"] {
+        background-color: #FF4B4B !important;
+        color: white !important;
+        border: none !important;
+    }
+    .stButton > button[kind="primary"]:hover {
+        background-color: #e63939 !important;
+        border: none !important;
+    }
+    
     /* Buttons Styling */
     .stButton > button {
         border-radius: 4px;
@@ -89,12 +101,6 @@ st.markdown("""
         border: none;
         padding: 0.5rem 1rem;
         transition: all 0.3s ease;
-    }
-    
-    /* Primary Action Buttons (Predict) */
-    div[data-testid="stHorizontalBlock"] > div:nth-child(1) > div > div > div > button {
-         /* Selector này có thể không chính xác tuyệt đối do Streamlit dynamic class, 
-            nhưng ta sẽ dựa vào vị trí column để CSS hoặc dùng type="primary" của Streamlit */
     }
 
     /* Cards/Prediction Box */
@@ -258,6 +264,9 @@ L2_SVR_SCALER_PATH = os.path.join(BASE_DIR, 'models', 'layer2_svr_scaler.pkl')
 L3_MODEL_PATH = os.path.join(BASE_DIR, 'models', 'layer3_lstm_model.keras')
 L3_SCALER_PATH = os.path.join(BASE_DIR, 'models', 'layer3_scaler.pkl')
 L3_TARGET_SCALER_PATH = os.path.join(BASE_DIR, 'models', 'layer3_target_scaler.pkl')
+ML_ENSEMBLE_MODEL_PATH = os.path.join(BASE_DIR, 'models', 'ml_ensemble_model.pkl')
+REGIME_LSTM_MODEL_PATH = os.path.join(BASE_DIR, 'models', 'regime_lstm_model.pkl')
+REGIME_LSTM_SCALERS_PATH = os.path.join(BASE_DIR, 'models', 'regime_lstm_scalers.pkl')
 
 # Session state initialization
 if 'model_trained' not in st.session_state:
@@ -333,7 +342,7 @@ if 'ml_ensemble_metrics' not in st.session_state:
 def main():
 
     # Header
-    st.markdown('<h1 class="main-header">HỆ THỐNG DỰ BÁO GIÁ XRP/USDT</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">HỆ THỐNG DỰ ĐOÁN GIÁ CỔ PHIẾU XRP/USDT</h1>', unsafe_allow_html=True)
     
     # Sidebar
     with st.sidebar:
@@ -352,7 +361,7 @@ def main():
             st.write(f"Tổng số dòng: {len(st.session_state.df_features)}")
     
     # Tabs for different Layers
-    tab1, tab2, tab3 = st.tabs(["Lớp 1: Xu Hướng", "Lớp 2: Trong Ngày", "Lớp 3: Học Sâu"])
+    tab1, tab2, tab3 = st.tabs(["Layer 1", "Layer 2", "Layer 3"])
     
     with tab1:
         display_layer1_content()
@@ -368,7 +377,7 @@ def display_layer1_content():
     """Giao diện chính Layer 1 với bố cục phân khu chuyên nghiệp"""
     
     # --- KHU VỰC 1: QUẢN LÝ DỮ LIỆU ---
-    st.markdown('<div class="section-header">1. QUẢN LÝ DỮ LIỆU ĐẦU VÀO</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">1. NHẬP DỮ LIỆU ĐẦU VÀO</div>', unsafe_allow_html=True)
     with st.container(border=True):
         col_upload, col_view = st.columns([3, 1])
         
@@ -386,7 +395,7 @@ def display_layer1_content():
     # Hiển thị bảng dữ liệu (Toggle)
     if st.session_state.get('show_processed_data', False):
         if st.session_state.df_features is not None:
-            st.info(f"Đang hiển thị {len(st.session_state.df_features)} dòng dữ liệu đã xử lý.")
+            st.toast(f"Đang hiển thị {len(st.session_state.df_features)} dòng dữ liệu đã xử lý.", icon="👁️")
             st.dataframe(st.session_state.df_features, use_container_width=True, height=300)
         else:
             st.warning("Chưa có dữ liệu để hiển thị. Vui lòng tải file lên.")
@@ -410,14 +419,12 @@ def display_layer1_content():
             # Nút huấn luyện
             col_train1, col_train2 = st.columns(2)
             with col_train1:
-                # Nút chuyển sang màu đỏ (primary) nếu đã train xong
-                rf_btn_type = "primary" if st.session_state.model_trained else "secondary"
-                if st.button("Train RandomForest", use_container_width=True, type=rf_btn_type):
+                # Luôn để màu đỏ (primary) theo yêu cầu người dùng
+                if st.button("Train RandomForest", use_container_width=True, type="primary"):
                     train_model(model_type="RF")
             with col_train2:
-                # Nút chuyển sang màu đỏ (primary) nếu đã train xong
-                svr_btn_type = "primary" if st.session_state.svr_model_trained else "secondary"
-                if st.button("Train SVR (Vector)", use_container_width=True, type=svr_btn_type):
+                # Luôn để màu đỏ (primary) theo yêu cầu người dùng
+                if st.button("Train SVR (Vector)", use_container_width=True, type="primary"):
                     train_model(model_type="SVR")
             
             st.divider()
@@ -433,7 +440,7 @@ def display_layer1_content():
                 model_options = ["Tất cả (All)", "RandomForest (1-Day)", "SVR (1-Day)", "Dự báo 7-Ngày"]
                 selected_load = st.selectbox("Chọn mô hình để tải:", model_options, label_visibility="collapsed")
                 
-                if st.button("Tải Mô hình Đã chọn", use_container_width=True):
+                if st.button("Tải Mô hình Đã chọn", use_container_width=True, type="primary"):
                     if selected_load == "Tất cả (All)":
                         load_saved_model(model_type="ALL")
                         load_saved_7day_models()
@@ -521,7 +528,7 @@ def load_and_process_data(file_buffer=None, target_path=None):
                 
             # Store in session state
             st.session_state.df_features = df_features
-            st.success(f"Đã tải {len(df)} dòng dữ liệu từ {target_path if target_path else 'file nguồn'} thành công!")
+            st.toast(f"Đã tải {len(df)} dòng dữ liệu thành công!")
             
         except Exception as e:
             st.error(f"Lỗi khi xử lý dữ liệu: {e}")
@@ -680,7 +687,7 @@ def load_saved_7day_models():
             if multi_models and multi_scalers:
                 st.session_state.l1_multi_models = multi_models
                 st.session_state.l1_multi_scalers = multi_scalers
-                st.success("Đã tải thành công bộ mô hình dự báo 7 ngày!")
+                st.toast("Đã tải thành công bộ mô hình dự báo 7 ngày!")
             else:
                 st.warning("Không tìm thấy file mô hình 7 ngày đã lưu.")
         except Exception as e:
@@ -822,7 +829,7 @@ def make_prediction():
                     'lower_bound': comparison_results['SVR']['lower']
                 })
             
-            st.success("Đã cập nhật dự đoán so sánh!")
+            st.toast("Đã cập nhật dự đoán so sánh!")
             
         except Exception as e:
             st.error(f"Lỗi khi dự đoán: {e}")
@@ -878,7 +885,7 @@ def make_7day_prediction():
             
             # Store in session state
             st.session_state.prediction_7days = forecast_df
-            st.success("Đã hoàn thành dự đoán xu hướng 7 ngày!")
+            st.toast("Đã hoàn thành dự đoán xu hướng 7 ngày!", icon="📈")
             
         except Exception as e:
             st.error(f"Lỗi khi dự đoán 7 ngày: {e}")
@@ -1573,7 +1580,7 @@ def train_layer2_logic():
             st.session_state.l2_svr_scaler = svr_scaler_l2
             st.session_state.l2_svr_model_trained = True
             
-            st.success(f"Đã train Layer 2 (Ridge & SVR) thành công!")
+            st.toast("✓ Đã train Layer 2 (Ridge & SVR) thành công!", icon="🚀")
             
         except Exception as e:
             st.error(f"Lỗi khi train L2: {e}")
@@ -1592,7 +1599,7 @@ def load_l2_model():
                 st.session_state.l2_ridge_model = ridge_model
                 st.session_state.l2_ridge_scaler = ridge_scaler
                 st.session_state.l2_ridge_model_trained = True
-                st.info("Đã tải mô hình L2 Ridge")
+                st.toast("Đã tải mô hình L2 Ridge", icon="📥")
                 
             # Load SVR
             svr_model = load_model(L2_SVR_MODEL_PATH)
@@ -1601,9 +1608,9 @@ def load_l2_model():
                 st.session_state.l2_svr_model = svr_model
                 st.session_state.l2_svr_scaler = svr_scaler
                 st.session_state.l2_svr_model_trained = True
-                st.info("Đã tải mô hình L2 SVR")
+                st.toast("Đã tải mô hình L2 SVR", icon="📥")
                 
-            st.success("Tải mô hình Layer 2 hoàn tất!")
+            st.toast("✓ Tải mô hình Layer 2 hoàn tất!", icon="✅")
         except Exception as e:
             st.error(f"Lỗi khi load L2 models: {e}")
 
@@ -1674,7 +1681,7 @@ def load_l3_custom_data(uploaded_file):
         required = ['Date', 'Price', 'Open', 'High', 'Low', 'Vol']
         if all(col in df.columns for col in required):
             st.session_state.df_l3_raw = df[required]
-            st.success(f"Đã tải dữ liệu từ {uploaded_file.name} cho Layer 3!")
+            st.toast(f"Đã tải dữ liệu cho Layer 3!", icon="📥")
             st.dataframe(df.head())
         else:
             st.error(f"File CSV thiếu các cột bắt buộc: {required}")
@@ -1696,7 +1703,7 @@ def prepare_l3_features():
         try:
             df_l3 = create_lstm_features(df)
             st.session_state.df_l3 = df_l3
-            st.success(f"Đã chuẩn bị {len(df_l3.columns)} features cho LSTM!")
+            st.toast("✓ Đã chuẩn bị features cho LSTM!", icon="⚙️")
             st.dataframe(df_l3.tail(5))
         except Exception as e:
             st.error(f"Lỗi: {e}")
@@ -1735,7 +1742,7 @@ def train_l3_model():
             st.session_state.l3_model_trained = True
             st.session_state.l3_feature_cols = feature_cols
             
-            st.success("Huấn luyện Layer 3 (LSTM) thành công!")
+            st.toast("✓ Huấn luyện Layer 3 thành công!", icon="🚀")
         except Exception as e:
             st.error(f"Lỗi khi train LSTM: {e}")
 
@@ -1752,7 +1759,7 @@ def load_l3_model():
                 st.session_state.l3_feature_cols = ['Open', 'High', 'Low', 'Price', 'Vol', 'VVR', 'VWAP', 
                                                 'Lag_1', 'Lag_2', 'Lag_3', 'Lag_5', 'Lag_7', 
                                                 'Price_Change', 'Volatility', 'MA5', 'MA10']
-                st.success("Đã load Layer 3 thành công!")
+                st.toast("✓ Đã load Layer 3 thành công!", icon="💾")
             else:
                 st.warning("Không tìm thấy tệp mô hình Layer 3.")
         except Exception as e:
@@ -1788,7 +1795,7 @@ def make_l3_prediction():
         })
         
         st.session_state.l3_prediction = pred_df
-        st.success("Đã hoàn thành dự báo LSTM cho 7 ngày tới!")
+        st.toast("✓ Đã hoàn thành dự báo LSTM!", icon="🔮")
         
     except Exception as e:
         st.error(f"Lỗi khi dự báo LSTM: {e}")
@@ -1869,9 +1876,7 @@ def display_layer3_content():
     
     st.markdown('\u003cdiv class="section-header"\u003eLỚP 3: HỌC SÂU \u0026 SEQUENCE LEARNING\u003c/div\u003e', unsafe_allow_html=True)
     
-    if st.session_state.df_features is None:
-        st.info("Vui lòng tải dữ liệu ở Tab Layer 1 trước.")
-        return
+    # Removed dependency check to allow custom file upload in sub-tabs
     
     # Create 3 tabs
     tab_keras, tab_regime, tab_ensemble = st.tabs([
@@ -1906,54 +1911,117 @@ def display_keras_lstm_tab():
 
 
 def display_regime_lstm_tab():
-    """Tab mới - Regime-aware LSTM"""
+    """Tab mới - Regime-aware LSTM theo đúng luồng LSTMCustom.ipynb"""
     st.subheader("🟠 Regime LSTM - Nhận diện chế độ volatility")
     
     st.info("""
-    **Đặc điểm:**
-    - Custom LSTM implementation (NumPy) với khả năng nhận diện regime
-    - Sử dụng volatility z-score để phát hiện spike
-    - Lookback: 30 days | Forecast: T+7
+    **Luồng hoạt động (Theo LSTMCustom.ipynb):**
+    1. **Tải dữ liệu**: CSV -> Sắp xếp Date.
+    2. **Xử lý đặc trưng**: Tạo 18 features (VVR, VWAP, Lags, MAs, vol_z, is_spike).
+    3. **Chuẩn bị & Scale**: Min-Max Scaling [0, 1] cho X và y.
+    4. **Sequence**: Lookback 30 ngày -> Dự báo T+7.
+    5. **Train**: 40% Train / 60% Test. Custom LSTM (NumPy) với full BPTT.
     """)
     
-    # Training controls
-    col_train, col_pred = st.columns([1, 1])
+    # --- Bước 1: Chọn Dữ liệu ---
+    st.markdown("### 1. Chọn Dữ liệu")
+    regime_file = st.file_uploader("Tải lên file CSV (Ví dụ: data2.csv)", type=['csv'], key="regime_uploader")
     
-    with col_train:
-        st.markdown("**Huấn luyện Mô hình**")
-        
-        with st.form("regime_lstm_form"):
-            epochs = st.slider("Số epochs", 20, 100, 60, 10)
-            lr = st.number_input("Learning rate", 0.0001, 0.01, 0.001, format="%.4f")
+    if regime_file is not None:
+        try:
+            df_r = pd.read_csv(regime_file)
+            if 'Date' in df_r.columns:
+                df_r['Date'] = pd.to_datetime(df_r['Date'])
+                df_r = df_r.sort_values('Date').reset_index(drop=True)
             
-            train_btn = st.form_submit_button("Train Regime LSTM", type="primary", use_container_width=True)
+            # Map columns Price/Vol/High/Low/Open
+            col_map = {
+                'Close': 'Price',
+                'Volume': 'Vol',
+                'high': 'High',
+                'low': 'Low',
+                'open': 'Open'
+            }
+            for old_col, new_col in col_map.items():
+                if old_col in df_r.columns and new_col not in df_r.columns:
+                    df_r.rename(columns={old_col: new_col}, inplace=True)
+            
+            # Kiểm tra các cột bắt buộc
+            required_cols = ['Price', 'Vol', 'High', 'Low']
+            missing = [c for c in required_cols if c not in df_r.columns]
+            
+            if missing:
+                st.error(f"❌ Thiếu các cột bắt buộc: {', '.join(missing)}")
+            else:
+                st.session_state.df_regime_raw = df_r
+                st.toast(f"✓ Đã tải {len(df_r)} dòng dữ liệu gốc.", icon="📥")
+        except Exception as e:
+            st.error(f"Lỗi tải file: {e}")
+            
+    if 'df_regime_raw' in st.session_state:
+        st.caption(f"Dữ liệu gốc hiện tại: {len(st.session_state.df_regime_raw)} dòng")
+        with st.expander("🔍 Xem dữ liệu gốc (Raw Data)"):
+            st.dataframe(st.session_state.df_regime_raw.head(10), use_container_width=True)
+    
+    st.divider()
+
+    # --- Bước 2: Feature Engineering ---
+    st.markdown("### 2. Xử lý Đặc trưng (Feature Engineering)")
+    col_fe1, col_fe2 = st.columns([2, 1])
+    with col_fe1:
+        st.write("Tạo 18 đặc trưng bao gồm các chỉ số Volatility, VWAP, Lags, MAs và Regime detection (vol_z).")
+    with col_fe2:
+        if st.button("Xử lý Features", type="primary", use_container_width=True, key="process_regime"):
+            if 'df_regime_raw' in st.session_state:
+                with st.spinner("Đang tính toán đặc trưng..."):
+                    df_features = create_regime_features(st.session_state.df_regime_raw)
+                    st.session_state.df_regime = df_features
+                    st.toast("✓ Đã tạo xong 18 features!", icon="⚙️")
+            else:
+                st.error("Vui lòng tải dữ liệu ở Bước 1.")
+
+    if 'df_regime' in st.session_state:
+        st.info(f"Dữ liệu sẵn sàng để Train: {len(st.session_state.df_regime)} dòng | 18 Features.")
+        with st.expander("📊 Xem dữ liệu đã xử lý (Processed Features)"):
+            st.dataframe(st.session_state.df_regime.head(10), use_container_width=True)
+
+    st.divider()
+
+    # --- Bước 3: Huấn luyện ---
+    st.markdown("### 3. Huấn luyện Mô hình (Training)")
+    col_train_params, col_train_action = st.columns([1, 1])
+    
+    with col_train_params:
+        with st.form("regime_lstm_form"):
+            epochs = st.slider("Số epochs (Notebook dùng 70)", 20, 150, 70, 10)
+            lr = st.number_input("Learning rate", 0.0001, 0.01, 0.001, format="%.4f")
+            train_btn = st.form_submit_button("Bắt đầu Huấn luyện", type="primary", use_container_width=True)
         
         if train_btn:
             train_regime_lstm_model(epochs, lr)
-    
-    with col_pred:
-        st.markdown("**Dự báo**")
-        st.write("")  # Spacer
-        st.write("")
-        
-        disabled = not st.session_state.regime_lstm_trained
-        if st.button("Dự báo T+7", disabled=disabled, use_container_width=True, key="regime_predict"):
-            make_regime_lstm_prediction()
-        
+
+    with col_train_action:
+        st.write("Hoặc khôi phục mô hình từ lần train trước:")
+        if st.button("Tải mô hình đã lưu", use_container_width=True):
+            load_regime_lstm_model_from_disk()
+            
         if st.session_state.regime_lstm_trained:
-            st.success("✓ Model đã train")
+            st.success("✓ Trạng thái: Sẵn sàng dự báo")
         else:
-            st.warning("Chưa train model")
-    
+            st.warning("Trạng thái: Chưa có mô hình")
+
     st.divider()
-    
-    # Display results
+
+    # --- Bước 4: Dự báo ---
+    st.markdown("### 4. Dự báo và Kết quả (Prediction)")
+    if st.button("Thực hiện Dự báo T+7", type="primary", disabled=not st.session_state.regime_lstm_trained, use_container_width=True):
+        make_regime_lstm_prediction()
+
     if st.session_state.regime_lstm_metrics is not None:
         display_regime_lstm_results()
 
 
 def display_ml_ensemble_tab():
-    """Tab mới - ML Ensemble"""
     st.subheader("🟢 ML Ensemble - Stacking Approach")
     
     st.info("""
@@ -1964,6 +2032,36 @@ def display_ml_ensemble_tab():
     - Lookback: 30 days | Forecast: T+7
     """)
     
+    st.markdown("**1. Chọn Dữ liệu**")
+    ensemble_file = st.file_uploader("Tải lên file CSV riêng cho ML Ensemble (Optional)", type=['csv'], key="ensemble_uploader")
+    
+    if ensemble_file is not None:
+        try:
+            df_e = pd.read_csv(ensemble_file)
+            if 'Date' in df_e.columns:
+                df_e['Date'] = pd.to_datetime(df_e['Date'])
+                df_e = df_e.sort_values('Date').reset_index(drop=True)
+            
+            if 'Close' in df_e.columns and 'Price' not in df_e.columns:
+                df_e.rename(columns={'Close': 'Price'}, inplace=True)
+            if 'Volume' in df_e.columns and 'Vol' not in df_e.columns:
+                df_e.rename(columns={'Volume': 'Vol'}, inplace=True)
+                
+            if st.button("Xử lý dữ liệu ML Ensemble", key="process_ensemble"):
+                with st.spinner("Đang tạo features (ML Ensemble specific)..."):
+                    df_e = create_ml_features(df_e)
+                    st.session_state.df_ensemble = df_e
+                    st.toast(f"Đã tải {len(df_e)} dòng dữ liệu riêng!", icon="📋")
+        except Exception as e:
+            st.error(f"Lỗi tải file: {e}")
+            
+    if 'df_ensemble' in st.session_state:
+        st.caption(f"Đang sử dụng dữ liệu riêng: {len(st.session_state.df_ensemble)} dòng")
+    elif st.session_state.df_features is not None:
+        st.caption(f"Đang sử dụng dữ liệu chung từ Layer 1: {len(st.session_state.df_features)} dòng")
+    
+    st.markdown("---")
+    
     # Training controls
     col_train, col_pred = st.columns([1, 1])
     
@@ -1973,6 +2071,9 @@ def display_ml_ensemble_tab():
         
         if st.button("Train ML Ensemble", type="primary", use_container_width=True):
             train_ml_ensemble_model()
+        
+        if st.button("Load ML Ensemble", use_container_width=True):
+            load_ml_ensemble_model_from_disk()
     
     with col_pred:
         st.markdown("**Dự báo**")
@@ -1983,7 +2084,7 @@ def display_ml_ensemble_tab():
             make_ml_ensemble_prediction()
         
         if st.session_state.ml_ensemble_trained:
-            st.success("✓ Model đã train")
+            st.toast("✓ Model Ensemble đã sẵn sàng", icon="✅")
         else:
             st.warning("Chưa train model")
     
@@ -2002,12 +2103,31 @@ def train_regime_lstm_model(epochs=60, lr=0.001):
     """Train Regime LSTM model"""
     with st.spinner(f"Đang training Regime LSTM ({epochs} epochs)..."):
         try:
-            df = st.session_state.df_features.copy()
+            # Ưu tiên dữ liệu riêng của Regime Tab, nếu không có thì dùng chung
+            if 'df_regime' in st.session_state and st.session_state.df_regime is not None:
+                df = st.session_state.df_regime.copy()
+            elif 'df_features' in st.session_state and st.session_state.df_features is not None:
+                df = st.session_state.df_features.copy()
+            else:
+                st.error("❌ Không tìm thấy dữ liệu! Vui lòng tải file CSV ở trên hoặc load dữ liệu ở Layer 1 trước.")
+                return
             
             # Ensure required columns
             if 'Price' not in df.columns:
                 st.error("Dữ liệu thiếu cột 'Price'!")
                 return
+            
+            # Đảm bảo dữ liệu được sắp xếp theo thời gian tăng dần
+            if 'Date' in df.columns:
+                df['Date'] = pd.to_datetime(df['Date'])
+                df = df.sort_values('Date').reset_index(drop=True)
+            
+            # Validate that features have been created (Regime specific)
+            if 'vol_z' not in df.columns:
+                st.warning("⚠️ Dữ liệu chưa có regime features. Đang tự động xử lý...")
+                from utils.regime_lstm import create_regime_features
+                df = create_regime_features(df)
+                st.success("✓ Đã xử lý regime features tự động")
             
             # Train model
             model, scalers, metrics = train_regime_lstm(
@@ -2017,7 +2137,7 @@ def train_regime_lstm_model(epochs=60, lr=0.001):
                 lookback=30, 
                 horizon=7,
                 test_size=0.4,
-                verbose=False
+                verbose=True
             )
             
             # Save to session
@@ -2026,7 +2146,11 @@ def train_regime_lstm_model(epochs=60, lr=0.001):
             st.session_state.regime_lstm_metrics = metrics
             st.session_state.regime_lstm_trained = True
             
-            st.success(f"✓ Training hoàn tất! MAE: {metrics['mae']:.4f}")
+            # Save to disk
+            save_model(model, REGIME_LSTM_MODEL_PATH)
+            save_model(scalers, REGIME_LSTM_SCALERS_PATH)
+            
+            st.toast(f"✓ Training hoàn tất! MAE: {metrics['mae']:.4f}", icon="🚀")
             
         except Exception as e:
             st.error(f"Lỗi khi training: {e}")
@@ -2038,13 +2162,28 @@ def train_ml_ensemble_model():
     """Train ML Ensemble model"""
     with st.spinner("Đang training ML Ensemble..."):
         try:
-            df = st.session_state.df_features.copy()
+            # Ưu tiên dữ liệu riêng của Ensemble Tab
+            if 'df_ensemble' in st.session_state and st.session_state.df_ensemble is not None:
+                df = st.session_state.df_ensemble.copy()
+            elif 'df_features' in st.session_state and st.session_state.df_features is not None:
+                df = st.session_state.df_features.copy()
+            else:
+                st.error("❌ Không tìm thấy dữ liệu! Vui lòng tải file CSV ở trên hoặc load dữ liệu ở Layer 1 trước.")
+                return
+
+            df.to_csv("df_features_export.csv", index=False)
             
-            # Ensure required columns (rename if needed)
-            if 'Price' in df.columns and 'Close' not in df.columns:
-                df.rename(columns={'Price': 'Close'}, inplace=True)
-            if 'Vol' in df.columns and 'Volume' not in df.columns:
-                df.rename(columns={'Vol': 'Volume'}, inplace=True)
+            # Đảm bảo dữ liệu được sắp xếp theo thời gian tăng dần
+            if 'Date' in df.columns:
+                df['Date'] = pd.to_datetime(df['Date'])
+                df = df.sort_values('Date').reset_index(drop=True)
+            
+            # Validate that features have been created
+            if 'RSI_14' not in df.columns:
+                st.warning("⚠️ Dữ liệu chưa được xử lý features. Đang tự động xử lý...")
+                from utils.ml_ensemble import create_ml_features
+                df = create_ml_features(df)
+                st.success("✓ Đã xử lý features tự động")
             
             # Train model
             ensemble, metrics = train_ml_ensemble(
@@ -2060,13 +2199,47 @@ def train_ml_ensemble_model():
             st.session_state.ml_ensemble_metrics = metrics
             st.session_state.ml_ensemble_trained = True
             
+            # Save to disk
+            save_model(ensemble, ML_ENSEMBLE_MODEL_PATH)
+            
             mae = metrics['test']['mae']
-            st.success(f"✓ Training hoàn tất! MAE: {mae:.4f}")
+            st.toast(f"✓ Training hoàn tất! MAE: {mae:.4f}", icon="🚀")
             
         except Exception as e:
             st.error(f"Lỗi khi training: {e}")
-            import traceback
             st.error(traceback.format_exc())
+
+
+def load_regime_lstm_model_from_disk():
+    """Load Regime LSTM model from disk"""
+    with st.spinner("Đang tải model Regime LSTM..."):
+        try:
+            model = load_model(REGIME_LSTM_MODEL_PATH)
+            scalers = load_model(REGIME_LSTM_SCALERS_PATH)
+            if model is not None and scalers is not None:
+                st.session_state.regime_lstm_model = model
+                st.session_state.regime_lstm_scalers = scalers
+                st.session_state.regime_lstm_trained = True
+                st.toast("✓ Đã tải model Regime LSTM từ disk!", icon="💾")
+            else:
+                st.warning("Không tìm thấy file model để tải.")
+        except Exception as e:
+            st.error(f"Lỗi khi tải model: {e}")
+
+
+def load_ml_ensemble_model_from_disk():
+    """Load ML Ensemble model from disk"""
+    with st.spinner("Đang tải model ML Ensemble..."):
+        try:
+            ensemble = load_model(ML_ENSEMBLE_MODEL_PATH)
+            if ensemble is not None:
+                st.session_state.ml_ensemble_model = ensemble
+                st.session_state.ml_ensemble_trained = True
+                st.toast("✓ Đã tải model ML Ensemble từ disk!", icon="💾")
+            else:
+                st.warning("Không tìm thấy file model để tải.")
+        except Exception as e:
+            st.error(f"Lỗi khi tải model: {e}")
 
 
 # ======================
@@ -2077,7 +2250,16 @@ def make_regime_lstm_prediction():
     """Make prediction using Regime LSTM"""
     with st.spinner("Đang dự báo với Regime LSTM..."):
         try:
-            df = st.session_state.df_features.copy()
+            # Ưu tiên dữ liệu riêng
+            if 'df_regime' in st.session_state and st.session_state.df_regime is not None:
+                df = st.session_state.df_regime.copy()
+            else:
+                df = st.session_state.df_features.copy()
+                
+            # Đảm bảo sắp xếp thời gian
+            if 'Date' in df.columns:
+                df['Date'] = pd.to_datetime(df['Date'])
+                df = df.sort_values('Date').reset_index(drop=True)
             
             # Get latest 30+ rows for lookback
             df_latest = df.tail(35)  # Extra rows for feature engineering
@@ -2116,13 +2298,16 @@ def make_ml_ensemble_prediction():
     """Make prediction using ML Ensemble"""
     with st.spinner("Đang dự báo với ML Ensemble..."):
         try:
-            df = st.session_state.df_features.copy()
+            # Ưu tiên dữ liệu riêng
+            if 'df_ensemble' in st.session_state and st.session_state.df_ensemble is not None:
+                df = st.session_state.df_ensemble.copy()
+            else:
+                df = st.session_state.df_features.copy()
             
-            # Rename columns if needed
-            if 'Price' in df.columns and 'Close' not in df.columns:
-                df.rename(columns={'Price': 'Close'}, inplace=True)
-            if 'Vol' in df.columns and 'Volume' not in df.columns:
-                df.rename(columns={'Vol': 'Volume'}, inplace=True)
+            # Đảm bảo sắp xếp thời gian
+            if 'Date' in df.columns:
+                df['Date'] = pd.to_datetime(df['Date'])
+                df = df.sort_values('Date').reset_index(drop=True)
             
             # Get latest 30+ rows
             df_latest = df.tail(60)  # Extra for MA calculations
@@ -2186,6 +2371,33 @@ def display_regime_lstm_results():
             height=300
         )
         st.plotly_chart(fig, use_container_width=True)
+    
+    # Actual vs Predicted plot (from notebook logic)
+    if 'y_true' in metrics and 'y_pred' in metrics:
+        import plotly.graph_objects as go
+        
+        fig_pred = go.Figure()
+        fig_pred.add_trace(go.Scatter(
+            y=metrics['y_true'],
+            mode='lines',
+            name='Actual (Test)',
+            line=dict(color='gray', width=1)
+        ))
+        fig_pred.add_trace(go.Scatter(
+            y=metrics['y_pred'],
+            mode='lines',
+            name='Predicted (Test)',
+            line=dict(color='orange', width=2)
+        ))
+        fig_pred.update_layout(
+            title="Actual vs Predicted (Test Set)",
+            xaxis_title="Time Index",
+            yaxis_title="Price",
+            template='plotly_white',
+            height=400,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        st.plotly_chart(fig_pred, use_container_width=True)
     
     # Prediction display
     if 'regime_lstm_prediction' in st.session_state:
