@@ -1379,22 +1379,36 @@ def handle_manual_input_submission(date, price, open_p, high, low, vol):
 
 def display_layer2_content():
     """Display Layer 2 (Within-day prediction) content"""
-    st.header("Dự đoán giá trong ngày")
+    # --- HÀNG 1: NHẬP LIỆU & HUẤN LUYỆN LAYER 2 ---
+    col_top_left, col_top_right = st.columns([1, 1.8])
     
-    if st.session_state.df_features is None:
-        st.info("Vui lòng tải dữ liệu ở Sidebar trước.")
-        return
-
-    # Train/Load buttons for L2
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Train mô hình Layer 2", use_container_width=True, disabled=not st.session_state.model_trained):
-            train_layer2_logic()
-    with col2:
-        if st.button("Load Layer 2 model", use_container_width=True):
-            load_l2_model()
+    with col_top_left:
+        st.markdown('<div class="section-header">1. NHẬP DỮ LIỆU</div>', unsafe_allow_html=True)
+        with st.container(border=True):
+            uploaded_file_l2 = st.file_uploader("CSV/Excel file (L2)", type=['csv', 'xlsx'], key="file_l2", label_visibility="collapsed")
+            if st.button("Xử lý", use_container_width=True, type="primary", key="btn_process_l2", disabled=(uploaded_file_l2 is None)):
+                load_and_process_data(uploaded_file_l2)
+                
+    with col_top_right:
+        st.markdown('<div class="section-header">2. HUẤN LUYỆN LAYER 2</div>', unsafe_allow_html=True)
+        with st.container(border=True):
+            svr_l2_status = "Đã train" if st.session_state.get('l2_svr_model_trained', False) else "Chưa train"
+            ridge_l2_status = "Đã train" if st.session_state.get('l2_ridge_model_trained', False) else "Chưa train"
+            st.caption(f"Trạng thái Layer 2: Ridge [{ridge_l2_status}] | SVR [{svr_l2_status}]")
+            
+            col_l2_btn1, col_l2_btn2 = st.columns(2)
+            with col_l2_btn1:
+                if st.button("Train Layer 2", use_container_width=True, type="primary", key="btn_train_l2", disabled=not st.session_state.model_trained):
+                    train_layer2_logic()
+            with col_l2_btn2:
+                if st.button("Load L2 Models", use_container_width=True, key="btn_load_l2"):
+                    load_l2_model()
 
     st.markdown("---")
+    
+    if st.session_state.df_features is None:
+        st.info("Vui lòng tải dữ liệu ở Mục 1 hoặc Sidebar để bắt đầu.")
+        return
 
     # Prediction Section
     st.subheader("Dự đoán giá chốt phiên trực tuyến")
