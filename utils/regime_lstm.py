@@ -141,7 +141,7 @@ def create_regime_features(df):
 # DATA PREPARATION (MIN-MAX SCALING)
 # ==============================================
 
-def prepare_regime_data(df, lookback=30, horizon=7, test_size=0.4):
+def prepare_regime_data(df, lookback=30, horizon=7, test_size=0.2):
     feature_cols = [c for c in df.columns if c not in ['Date', 'Price']]
     X_raw = df[feature_cols].values
     y_raw = df['Price'].values.reshape(-1, 1)
@@ -167,11 +167,8 @@ def prepare_regime_data(df, lookback=30, horizon=7, test_size=0.4):
     y_seq = np.array(y_seq)
     y_dates = np.array(y_dates)
     
-    # Split train/test (Note: notebook uses 0.4 split, but split = int(len * 0.4) for TRAIN)
-    # Then Test is the rest (60% test)
-    split = int(len(X_seq) * (1 - test_size)) if test_size < 1 else int(len(X_seq) * 0.4)
-    # To strictly match notebook where TRAIN = 40%:
-    split = int(len(X_seq) * 0.4)
+    # Split train/test
+    split = int(len(X_seq) * (1 - test_size))
     
     X_train, X_test = X_seq[:split], X_seq[split:]
     y_train, y_test = y_seq[:split], y_seq[split:]
@@ -198,7 +195,7 @@ def prepare_regime_data(df, lookback=30, horizon=7, test_size=0.4):
 # ==============================================
 
 def train_regime_lstm(df, epochs=70, lr=0.001, lookback=30, horizon=7, 
-                     hidden_dim=32, test_size=0.4, verbose=True):
+                     hidden_dim=32, test_size=0.2, verbose=True):
     """
     Train Regime LSTM model
     

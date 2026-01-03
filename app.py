@@ -568,9 +568,11 @@ def load_and_process_data(file_buffer=None, target_path=None):
             
             # Update active path
             if file_buffer is not None:
-                # For uploaded files, save a local copy to DISPLAY_DATA_PATH for persistence
-                df.to_csv(DISPLAY_DATA_PATH, index=False)
-                st.session_state.active_data_path = DISPLAY_DATA_PATH
+                # For uploaded files, save a local copy with its original name in the data folder
+                save_filename = file_buffer.name
+                save_path = os.path.join(BASE_DIR, 'data', save_filename)
+                df.to_csv(save_path, index=False)
+                st.session_state.active_data_path = save_path
             else:
                 st.session_state.active_data_path = path
                 
@@ -1246,9 +1248,13 @@ def display_manual_input_form():
     latest_date = df.iloc[-1]['Date']
     next_date = get_next_trading_date(latest_date)
     
+    target_path = st.session_state.get('active_data_path', DISPLAY_DATA_PATH)
+    target_filename = os.path.basename(target_path)
+    
     st.markdown(f'<div class="section-header">CẬP NHẬT DỮ LIỆU THỰC TẾ: {next_date.strftime("%d/%m/%Y")}</div>', unsafe_allow_html=True)
     
     with st.container(border=True):
+        st.caption(f"📁 Tệp đang cập nhật: **{target_filename}**")
         st.write("Vui lòng nhập thông tin thị trường chốt phiên để cập nhật hệ thống:")
         
         with st.form("manual_input_form", clear_on_submit=True):
@@ -1321,9 +1327,12 @@ def handle_manual_input_submission(date, price, open_p, high, low, vol):
         if 'RF_Pred_Tomorrow' in df_all_features.columns:
             df_all_features['RF_Pred_Today'] = df_all_features['RF_Pred_Tomorrow'].shift(1)
             
-        # 6. Lưu TOÀN BỘ dataframe với hàng trăm cột vào CSV
-        # Chuyển Date sang string YYYY-MM-DD trước khi lưu
-        df_save = df_all_features.copy()
+        # 6. Lưu dữ liệu thô (Chỉ Input và Date) vào CSV
+        # User yêu cầu chỉ lưu input và date vào file đã chọn
+        base_cols = ['Date', 'Price', 'Open', 'High', 'Low', 'Vol']
+        # Đảm bảo các cột tồn tại trong df_all_features
+        cols_to_save = [c for c in base_cols if c in df_all_features.columns]
+        df_save = df_all_features[cols_to_save].copy()
         df_save['Date'] = df_save['Date'].dt.strftime('%Y-%m-%d')
         df_save.to_csv(target_path, index=False)
         
@@ -2060,7 +2069,7 @@ def train_regime_lstm_model(epochs=60, lr=0.001):
                 lr=lr, 
                 lookback=30, 
                 horizon=7,
-                test_size=0.4,
+                test_size=0.2,
                 verbose=True
             )
             
@@ -2112,7 +2121,7 @@ def train_ml_ensemble_model():
                 df,
                 lookback=30,
                 horizon=7,
-                train_ratio=0.4,
+                train_ratio=0.8,
                 verbose=False
             )
             

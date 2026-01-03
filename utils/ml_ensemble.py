@@ -51,7 +51,7 @@ def create_ml_features(df):
 
 class MLEnsembleForecaster:
     
-    def __init__(self, lookback=30, horizon=7, train_ratio=0.4):
+    def __init__(self, lookback=30, horizon=7, train_ratio=0.8):
         """
         Initialize ML Ensemble
         
@@ -254,7 +254,7 @@ class MLEnsembleForecaster:
 # TRAINING FUNCTION
 # ==============================================
 
-def train_ml_ensemble(df, lookback=30, horizon=7, train_ratio=0.4, verbose=True):
+def train_ml_ensemble(df, lookback=30, horizon=7, train_ratio=0.8, verbose=True):
     # Initialize
     ensemble = MLEnsembleForecaster(
         lookback=lookback,
