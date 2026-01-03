@@ -2021,7 +2021,7 @@ def display_ml_ensemble_tab():
         if st.session_state.ml_ensemble_metrics is not None:
              display_ml_ensemble_results()
     else:
-        st.info("💡 Vui lòng tải file CSV riêng trong Tab này để huấn luyện mô hình Ensemble.")
+        st.info("Vui lòng tải file CSV riêng trong Tab này để huấn luyện mô hình Ensemble.")
     
     st.divider()
     
