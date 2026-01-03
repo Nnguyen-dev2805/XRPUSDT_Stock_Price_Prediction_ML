@@ -83,6 +83,17 @@ st.markdown("""
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
 
+    /* Global Secondary Buttons (Blue) */
+    .stButton > button:not([kind="primary"]) {
+        background-color: #007BFF !important;
+        color: white !important;
+        border: none !important;
+        transition: background-color 0.2s;
+    }
+    .stButton > button:not([kind="primary"]):hover {
+        background-color: #0062cc !important;
+    }
+    
     /* Primary buttons styling (Force Red) */
     .stButton > button[kind="primary"] {
         background-color: #FF4B4B !important;
@@ -91,16 +102,13 @@ st.markdown("""
     }
     .stButton > button[kind="primary"]:hover {
         background-color: #e63939 !important;
-        border: none !important;
     }
     
     /* Buttons Styling */
     .stButton > button {
         border-radius: 4px;
         font-weight: 600;
-        border: none;
         padding: 0.5rem 1rem;
-        transition: all 0.3s ease;
     }
 
     /* Cards/Prediction Box */
@@ -355,11 +363,6 @@ def main():
         """)
         
 
-        
-        if st.session_state.df_features is not None:
-            st.success("Dữ liệu đã sẵn sàng!")
-            st.write(f"Tổng số dòng: {len(st.session_state.df_features)}")
-    
     # Tabs for different Layers
     tab1, tab2, tab3 = st.tabs(["Layer 1", "Layer 2", "Layer 3"])
     
@@ -374,126 +377,175 @@ def main():
 
 
 def display_layer1_content():
-    """Giao diện chính Layer 1 với bố cục phân khu chuyên nghiệp"""
+    """Giao diện chính Layer 1 với bố cục lưới tối ưu"""
     
-    # --- KHU VỰC 1: QUẢN LÝ DỮ LIỆU ---
-    st.markdown('<div class="section-header">1. NHẬP DỮ LIỆU ĐẦU VÀO</div>', unsafe_allow_html=True)
-    with st.container(border=True):
-        col_upload, col_view = st.columns([3, 1])
-        
-        with col_upload:
-            uploaded_file = st.file_uploader("Tải lên file dữ liệu mới (CSV/Excel)", type=['csv', 'xlsx'], label_visibility="collapsed")
-            if uploaded_file is not None:
-                if st.button("Xác nhận & Xử lý Dữ liệu", use_container_width=True, type="primary"):
+    # --- HÀNG 1: NHẬP LIỆU & HUẤN LUYỆN ---
+    col_top_left, col_top_right = st.columns([1, 1.8])
+    
+    with col_top_left:
+        st.markdown('<div class="section-header">1. NHẬP DỮ LIỆU</div>', unsafe_allow_html=True)
+        with st.container(border=True):
+            uploaded_file = st.file_uploader("CSV/Excel file", type=['csv', 'xlsx'], label_visibility="collapsed")
+            
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                # Nút Xử lý luôn hiện nhưng disabled nếu chưa chọn file để giữ layout
+                if st.button("Xử lý", use_container_width=True, type="primary", disabled=(uploaded_file is None)):
                     load_and_process_data(uploaded_file)
-        
-        with col_view:
-            st.write("") # Spacer
-            if st.button("Xem dữ liệu sau xử lý", use_container_width=True, help="Xem bảng dữ liệu đã xử lý features"):
-                st.session_state.show_processed_data = not st.session_state.get('show_processed_data', False)
+            with col_btn2:
+                # Nút Xem Data (sẽ tự động có màu xanh theo CSS secondary)
+                if st.button("Xem Data", use_container_width=True, key="btn_view_data_l1"):
+                    st.session_state.show_processed_data = not st.session_state.get('show_processed_data', False)
 
-    # Hiển thị bảng dữ liệu (Toggle)
-    if st.session_state.get('show_processed_data', False):
-        if st.session_state.df_features is not None:
-            st.toast(f"Đang hiển thị {len(st.session_state.df_features)} dòng dữ liệu đã xử lý.", icon="👁️")
-            st.dataframe(st.session_state.df_features, use_container_width=True, height=300)
-        else:
-            st.warning("Chưa có dữ liệu để hiển thị. Vui lòng tải file lên.")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # --- KHU VỰC 2 & 3: CHIA CỘT ---
-    # Chia màn hình thành 2 cột lớn: Trái (Huấn luyện/Quản lý) - Phải (Dự báo)
-    col_left, col_right = st.columns([1, 1])
-    
-    # --- CỘT TRÁI: HUẤN LUYỆN & QUẢN LÝ MÔ HÌNH ---
-    with col_left:
-        st.markdown('<div class="section-header">2. HUẤN LUYỆN & TRẠNG THÁI</div>', unsafe_allow_html=True)
+    with col_top_right:
+        st.markdown('<div class="section-header">2. HUẤN LUYỆN MÔ HÌNH</div>', unsafe_allow_html=True)
         with st.container(border=True):
             # Trạng thái mô hình
             rf_status = "Đã train" if st.session_state.model_trained else "Chưa train"
             svr_status = "Đã train" if st.session_state.svr_model_trained else "Chưa train"
-            
             st.caption(f"Trạng thái: RF [{rf_status}] | SVR [{svr_status}]")
             
-            # Nút huấn luyện
-            col_train1, col_train2 = st.columns(2)
-            with col_train1:
-                # Luôn để màu đỏ (primary) theo yêu cầu người dùng
+            # Nút huấn luyện & Tinh chỉnh
+            col_t1, col_t2 = st.columns(2)
+            with col_t1:
+                with st.expander("Tham số RF", expanded=False):
+                    rf_n_estimators = st.number_input("n_estimators", 10, 2000, 500, 50, key="rf_n")
+                    rf_max_depth = st.number_input("max_depth", 1, 50, 8, 1, key="rf_d")
+                    rf_min_leaf = st.number_input("min_samples_leaf", 1, 100, 20, 1, key="rf_l")
+                
                 if st.button("Train RandomForest", use_container_width=True, type="primary"):
-                    train_model(model_type="RF")
-            with col_train2:
-                # Luôn để màu đỏ (primary) theo yêu cầu người dùng
+                    params = {
+                        'n_estimators': rf_n_estimators,
+                        'max_depth': rf_max_depth,
+                        'min_samples_leaf': rf_min_leaf,
+                        'random_state': 42,
+                        'n_jobs': -1
+                    }
+                    train_model(model_type="RF", custom_params=params)
+                    
+            with col_t2:
+                with st.expander("Tham số SVR", expanded=False):
+                    svr_c = st.number_input("C (Regularization)", 0.01, 1000.0, 100.0, 10.0, key="svr_c")
+                    svr_epsilon = st.number_input("Epsilon", 0.001, 1.0, 0.01, 0.005, format="%.3f", key="svr_e")
+                    svr_kernel = st.selectbox("Kernel", ["rbf", "linear", "poly"], index=0, key="svr_k")
+                
                 if st.button("Train SVR (Vector)", use_container_width=True, type="primary"):
-                    train_model(model_type="SVR")
+                    params = {
+                        'C': svr_c,
+                        'epsilon': svr_epsilon,
+                        'kernel': svr_kernel,
+                        'gamma': 'scale'
+                    }
+                    train_model(model_type="SVR", custom_params=params)
             
             st.divider()
             
-            # Quản lý file mô hình (Load/Delete)
-            st.markdown("**Quản lý File Mô hình:**")
-            
-            # Sử dụng Tabs nhỏ hoặc Columns cho Load/Delete để gọn gàng
-            m_tab1, m_tab2 = st.tabs(["Tải Mô hình", "Xóa Mô hình"])
-            
-            with m_tab1:
-                # Chọn model để load
-                model_options = ["Tất cả (All)", "RandomForest (1-Day)", "SVR (1-Day)", "Dự báo 7-Ngày"]
-                selected_load = st.selectbox("Chọn mô hình để tải:", model_options, label_visibility="collapsed")
+            # Quản lý file mô hình (Dùng Expander để tiết kiệm diện tích)
+            with st.expander("Tải mô hình", expanded=False):
+                m_tab1, m_tab2 = st.tabs(["Tải Mô hình", "Xóa Mô hình"])
+                with m_tab1:
+                    model_options = ["Tất cả (All)", "RandomForest (1-Day)", "SVR (1-Day)", "Dự báo 7-Ngày"]
+                    selected_load = st.selectbox("Chọn để tải:", model_options, label_visibility="collapsed")
+                    if st.button("Tải Mô hình Đã chọn", use_container_width=True, type="primary"):
+                        if selected_load == "Tất cả (All)":
+                            load_saved_model(model_type="ALL")
+                            load_saved_7day_models()
+                        elif selected_load == "RandomForest (1-Day)":
+                            load_saved_model(model_type="RF")
+                        elif selected_load == "SVR (1-Day)":
+                            load_saved_model(model_type="SVR")
+                        elif selected_load == "Dự báo 7-Ngày":
+                            load_saved_7day_models()
+                with m_tab2:
+                    files_to_delete = st.multiselect(
+                        "File cần xóa:",
+                        ["RandomForest", "SVR", "Dự báo 7-Ngày", "Layer 2 Models", "Layer 3 LSTM"],
+                        default=[]
+                    )
+                    if st.button("Xóa Mô hình Đã chọn", type="primary", use_container_width=True):
+                        if files_to_delete:
+                            delete_selected_models(files_to_delete)
                 
-                if st.button("Tải Mô hình Đã chọn", use_container_width=True, type="primary"):
-                    if selected_load == "Tất cả (All)":
-                        load_saved_model(model_type="ALL")
-                        load_saved_7day_models()
-                    elif selected_load == "RandomForest (1-Day)":
-                        load_saved_model(model_type="RF")
-                    elif selected_load == "SVR (1-Day)":
-                        load_saved_model(model_type="SVR")
-                    elif selected_load == "Dự báo 7-Ngày":
-                        load_saved_7day_models()
-            
-            with m_tab2:
-                # Chọn model để xóa
-                files_to_delete = st.multiselect(
-                    "Chọn file mô hình cần xóa:",
-                    ["RandomForest", "SVR", "Dự báo 7-Ngày", "Layer 2 Models", "Layer 3 LSTM"],
-                    default=[]
-                )
-                
-                if st.button("Xóa Mô hình Đã chọn", type="primary", use_container_width=True):
-                    if files_to_delete:
-                        delete_selected_models(files_to_delete)
-                    else:
-                        st.warning("Vui lòng chọn ít nhất một mô hình để xóa.")
+            # Thông tin mô hình hiện tại (Mới)
+            if st.session_state.model_trained or st.session_state.svr_model_trained:
+                with st.expander("Chi tiết mô hình đang tải", expanded=False):
+                    if st.session_state.model_trained and st.session_state.model is not None:
+                        st.markdown("**RandomForest (RF):**")
+                        p = st.session_state.model.get_params()
+                        st.json({k: p[k] for k in ['n_estimators', 'max_depth', 'min_samples_leaf'] if k in p})
+                    
+                    if st.session_state.svr_model_trained and st.session_state.svr_model is not None:
+                        st.markdown("**SVR (Support Vector):**")
+                        p = st.session_state.svr_model.get_params()
+                        st.json({k: p[k] for k in ['C', 'epsilon', 'kernel', 'gamma'] if k in p})
 
-    # --- CỘT PHẢI: DỰ BÁO TƯƠNG LAI ---
-    with col_right:
-        st.markdown('<div class="section-header">3. THỰC HIỆN DỰ BÁO</div>', unsafe_allow_html=True)
-        with st.container(border=True):
-            st.markdown("Chọn loại dự báo bạn muốn thực hiện:")
-            st.write("") # Spacer
-            
-            # Dự báo ngắn hạn
-            if st.button("DỰ BÁO NGÀY TIẾP THEO (T+1)", use_container_width=True, type="primary", 
-                         disabled=not (st.session_state.model_trained or st.session_state.svr_model_trained)):
-                make_prediction()
-            
-            st.write("") # Spacer
-            
-            # Dự báo dài hạn
-            if st.button("DỰ BÁO XU HƯỚNG 7 NGÀY (T+7)", use_container_width=True, 
-                         disabled=not (st.session_state.model_trained or st.session_state.svr_model_trained)):
-                make_7day_prediction()
-                
-            st.caption("*Yêu cầu mô hình đã được huấn luyện hoặc tải lên.")
+    # Hiển thị bảng dữ liệu (Toggle) - Full width bên dưới Row 1
+    if st.session_state.get('show_processed_data', False):
+        if st.session_state.df_features is not None:
+            st.toast(f"Đang hiển thị {len(st.session_state.df_features)} dòng đã xử lý.")
+            st.dataframe(st.session_state.df_features, use_container_width=True, height=300)
+        else:
+            st.warning("Vui lòng tải dữ liệu trước.")
 
-    st.markdown("---")
-    
-    # --- KHU VỰC 4: DASHBOARD KẾT QUẢ ---
-    # Display dashboard if data is loaded
+    st.divider()
+
+    # --- HÀNG 2: THỊ TRƯỜNG & DỰ BÁO & CẬP NHẬT ---
     if st.session_state.df_features is not None:
-        display_dashboard()
+        # Load df_display để dùng cho các component bên dưới
+        df_display = None
+        if os.path.exists(DISPLAY_DATA_PATH):
+            try: df_display = pd.read_csv(DISPLAY_DATA_PATH)
+            except: pass
+
+        col_main_left, col_main_right = st.columns([2.3, 1])
+        
+        with col_main_left:
+            # 1. DỮ LIỆU THỊ TRƯỜNG MỚI NHẤT (70% bề ngang)
+            display_market_status_card(st.session_state.df_features, df_display)
+            
+            # 1.5 KẾT QUẢ DỰ BÁO SO SÁNH (Đưa vào khoảng trống bên trái)
+            if 'prediction' in st.session_state:
+                st.write("") # Spacer
+                display_prediction_inline()
+        
+        with col_main_right:
+            # 2. THỰC HIỆN DỰ ĐOÁN (Phần trên - 30% ngang)
+            st.markdown('<div class="section-header">3. DỰ ĐOÁN</div>', unsafe_allow_html=True)
+            # Hiển thị các nút xếp chồng theo hàng dọc
+            with st.container(border=True):
+                if st.button("DỰ ĐOÁN T+1", use_container_width=True, type="primary", 
+                             disabled=not (st.session_state.model_trained or st.session_state.svr_model_trained)):
+                    make_prediction()
+                st.write("")
+                if st.button("DỰ ĐOÁN T+7", use_container_width=True, 
+                             disabled=not (st.session_state.model_trained or st.session_state.svr_model_trained)):
+                    make_7day_prediction()
+                st.caption("*Yêu cầu mô hình đã sẵn sàng.")
+
+            # 3. CẬP NHẬT DỮ LIỆU THỰC TẾ (Phần dưới - 30% ngang)
+            should_show_input = st.session_state.show_manual_input
+            if df_display is not None and not df_display.empty:
+                last_display = df_display.iloc[-1]
+                has_rf_tomorrow = 'RF_Pred_Tomorrow' in last_display and pd.notna(last_display['RF_Pred_Tomorrow'])
+                has_rf_today = 'RF_Pred_Today' in last_display and pd.notna(last_display['RF_Pred_Today'])
+                if has_rf_tomorrow and has_rf_today:
+                    should_show_input = True
+            
+            if should_show_input:
+                display_manual_input_form()
+
+        # --- HÀNG 3: KẾT QUẢ & PHÂN TÍCH ---
+        st.divider()
+        display_prediction_results_and_charts(st.session_state.df_features, df_display)
     else:
-        st.info("Chào mừng! Vui lòng bắt đầu bằng việc **Tải dữ liệu** ở Mục 1.")
+        # Khi chưa có dữ liệu
+        col1, col2 = st.columns([2.3, 1])
+        with col1:
+            st.markdown('<div class="section-header">DỮ LIỆU THỊ TRƯỜNG</div>', unsafe_allow_html=True)
+            st.info("Vui lòng bắt đầu bằng việc **Tải dữ liệu** ở Mục 1.")
+        with col2:
+            st.markdown('<div class="section-header">3. DỰ ĐOÁN</div>', unsafe_allow_html=True)
+            st.warning("Vui lòng tải dữ liệu trước.")
         # st.info("")
 
 
@@ -535,7 +587,7 @@ def load_and_process_data(file_buffer=None, target_path=None):
 
 
 #### train model
-def train_model(model_type="RF"):
+def train_model(model_type="RF", custom_params=None):
     if st.session_state.df_features is None:
         st.warning("Vui lòng tải dữ liệu trước!")
         return
@@ -556,7 +608,7 @@ def train_model(model_type="RF"):
                 st.session_state.df_features,
                 feature_columns=feature_cols,
                 target_column='Target_Price',
-                test_size=0.5
+                test_size=0.2
             )
             
             # Lưu danh sách features vào session state để dùng khi dự đoán
@@ -564,7 +616,7 @@ def train_model(model_type="RF"):
             
             if model_type == "RF":
                 # Train RF
-                model, scaler = train_layer1_model(X_train, y_train)
+                model, scaler = train_layer1_model(X_train, y_train, params=custom_params)
                 save_model(model, L1_MODEL_PATH)
                 save_model(scaler, L1_SCALER_PATH)
                 
@@ -582,7 +634,7 @@ def train_model(model_type="RF"):
                 # st.session_state.df_features['RF_Pred_Today'] = st.session_state.df_features['RF_Pred_Tomorrow'].shift(1)
             else:
                 # Train SVR
-                model, scaler = train_svr_model(X_train, y_train)
+                model, scaler = train_svr_model(X_train, y_train, params=custom_params)
                 save_model(model, L1_SVR_MODEL_PATH)
                 save_model(scaler, L1_SVR_SCALER_PATH)
                 
@@ -830,6 +882,7 @@ def make_prediction():
                 })
             
             st.toast("Đã cập nhật dự đoán so sánh!")
+            st.rerun() # Buộc Streamlit chạy lại để hiển thị kết quả ngay lập tức
             
         except Exception as e:
             st.error(f"Lỗi khi dự đoán: {e}")
@@ -886,6 +939,7 @@ def make_7day_prediction():
             # Store in session state
             st.session_state.prediction_7days = forecast_df
             st.toast("Đã hoàn thành dự đoán xu hướng 7 ngày!", icon="📈")
+            st.rerun() # Buộc Streamlit chạy lại để hiển thị kết quả ngay lập tức
             
         except Exception as e:
             st.error(f"Lỗi khi dự đoán 7 ngày: {e}")
@@ -913,18 +967,8 @@ def update_csv_with_prediction(prediction_val, col_name='RF_Pred_Tomorrow'):
         return False
 
 
-def display_dashboard():
-    """Display main dashboard merging source data and saved predictions"""
-    df = st.session_state.df_features
-    
-    # Load display data for predictions
-    df_display = None
-    if os.path.exists(DISPLAY_DATA_PATH):
-        try:
-            df_display = pd.read_csv(DISPLAY_DATA_PATH)
-        except:
-            pass
-            
+def display_market_status_card(df, df_display):
+    """Hiển thị thẻ trạng thái thị trường (Chỉ phần Card OHLV)"""
     # Latest data section - Only show latest date and single row
     st.markdown('<div class="section-header">DỮ LIỆU THỊ TRƯỜNG MỚI NHẤT</div>', unsafe_allow_html=True)
     
@@ -954,33 +998,27 @@ def display_dashboard():
 """, unsafe_allow_html=True)
             
         with col_details:
-            # Grid layout for OHLV
-            c1, c2, c3, c4 = st.columns(4)
+            # Dùng HTML Grid thay vì st.columns để tránh lỗi lồng cột (Nested Columns)
             data_points = [
-                ("Mở cửa (Open)", latest['Open']),
-                ("Cao nhất (High)", latest['High']),
-                ("Thấp nhất (Low)", latest['Low']),
-                ("Volume", latest['Vol'])
+                ("Mở cửa (Open)", f"${format_number(latest['Open'])}"),
+                ("Cao nhất (High)", f"${format_number(latest['High'])}"),
+                ("Thấp nhất (Low)", f"${format_number(latest['Low'])}"),
+                ("Volume", f"{int(latest['Vol']):,}")
             ]
             
-            for i, (label, val) in enumerate(data_points):
-                with [c1, c2, c3, c4][i]:
-                    # Format value
-                    fmt_val = f"{int(val):,}" if label == "Volume" else f"${format_number(val)}"
-                    st.markdown(f"""
-<div style="background: #F3F4F6; padding: 12px; border-radius: 8px; text-align: center; height: 100%;">
-<div class="market-label" style="font-size: 0.75rem;">{label}</div>
-<div class="market-value-sm" style="font-size: 1rem;">{fmt_val}</div>
-</div>
-""", unsafe_allow_html=True)
+            grid_html = '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">'
+            for label, fmt_val in data_points:
+                grid_html += f'<div style="background: #F3F4F6; padding: 10px; border-radius: 8px; text-align: center;">'
+                grid_html += f'<div class="market-label" style="font-size: 0.7rem;">{label}</div>'
+                grid_html += f'<div class="market-value-sm" style="font-size: 0.9rem;">{fmt_val}</div>'
+                grid_html += '</div>'
+            grid_html += '</div>'
+            
+            st.markdown(grid_html, unsafe_allow_html=True)
+            st.caption("Cập nhật từ file nguồn.")
 
-            st.write("") # Spacer
-            st.caption("Dữ liệu được cập nhật từ file CSV nguồn.")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    
     # Show only the latest row in a clean table
-    with st.expander("Xem chi tiết dòng dữ liệu thô (Latest Row Data)", expanded=False):
+    with st.expander("Xem chi tiết dòng dữ liệu thô (Dòng cuối cùng)", expanded=False):
         # Determine which columns to show as requested by user
         base_cols = ['Date', 'Price', 'Open', 'High', 'Low', 'Vol']
         latest_row_df = df[base_cols].tail(1).copy()
@@ -988,80 +1026,45 @@ def display_dashboard():
         # Add prediction columns from DISPLAY_DATA_PATH if available
         if df_display is not None and not df_display.empty:
             last_display = df_display.iloc[-1]
-            if 'RF_Pred_Tomorrow' in df_display.columns:
-                latest_row_df['RF_Pred_Tomorrow'] = last_display['RF_Pred_Tomorrow']
-            if 'RF_Pred_Today' in df_display.columns:
-                latest_row_df['RF_Pred_Today'] = last_display['RF_Pred_Today']
-            if 'SVR_Pred_Tomorrow' in df_display.columns:
-                latest_row_df['SVR_Pred_Tomorrow'] = last_display['SVR_Pred_Tomorrow']
-            if 'SVR_Pred_Today' in df_display.columns:
-                latest_row_df['SVR_Pred_Today'] = last_display['SVR_Pred_Today']
+            for c in ['RF_Pred_Tomorrow', 'RF_Pred_Today', 'SVR_Pred_Tomorrow', 'SVR_Pred_Today']:
+                if c in df_display.columns:
+                    latest_row_df[c] = last_display[c]
     
         latest_row_df['Date'] = latest_row_df['Date'].dt.strftime('%d/%m/%Y')
-        
-        # Format numeric columns
-        price_cols = ['Price', 'Open', 'High', 'Low', 'RF_Pred_Tomorrow', 'RF_Pred_Today', 'SVR_Pred_Tomorrow', 'SVR_Pred_Today']
-        for col in price_cols:
-            if col in latest_row_df.columns:
+        for col in latest_row_df.columns:
+            if col != 'Date' and col != 'Vol':
                 latest_row_df[col] = latest_row_df[col].apply(lambda x: f"${x:.4f}" if pd.notna(x) else "N/A")
-        
-        if 'Vol' in latest_row_df.columns:
-            latest_row_df['Vol'] = latest_row_df['Vol'].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "N/A")
+            elif col == 'Vol':
+                latest_row_df[col] = latest_row_df[col].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "N/A")
         
         st.dataframe(latest_row_df, use_container_width=True, hide_index=True)
-    
-    st.markdown("---")
 
-    # Logic tự động hiển thị form nhập liệu:
-    # Nếu dữ liệu mới nhất đã có dự báo RF (Tomorrow & Today) -> Hiển thị form để nhập thực tế cho ngày tiếp theo
-    should_show_input = st.session_state.show_manual_input
-    
-    if df_display is not None and not df_display.empty:
-        last_display = df_display.iloc[-1]
-        has_rf_tomorrow = 'RF_Pred_Tomorrow' in last_display and pd.notna(last_display['RF_Pred_Tomorrow'])
-        has_rf_today = 'RF_Pred_Today' in last_display and pd.notna(last_display['RF_Pred_Today'])
-        
-        if has_rf_tomorrow and has_rf_today:
-            should_show_input = True
-            st.success("Đã có dự báo đầy đủ. Mời nhập dữ liệu thực tế cho ngày tiếp theo bên dưới")
 
-    # Hiển thị form nhập dữ liệu thủ công
-    if should_show_input:
-        display_manual_input_form()
-        st.markdown("---")
-    
-    # Display prediction 1-day if available
-    if 'prediction' in st.session_state:
-        display_prediction_inline()
-        st.markdown("---")
+def display_prediction_results_and_charts(df, df_display):
+    """Hiển thị kết quả dự báo 7 ngày và biểu đồ phân tích (Phần dưới cùng)"""
+    # 1-day prediction results have been moved to the Dashboard area
     
     # Display 7-day prediction if available
+    if 'prediction_7days' in st.session_state:
+        display_7day_prediction_inline()
+        st.markdown("---")
     if 'prediction_7days' in st.session_state:
         display_7day_prediction_inline()
         st.markdown("---")
     
     # Charts section
     st.header("Phân tích Giá")
-    
     tab1, tab2, tab3, tab4 = st.tabs(["Lịch sử Giá", "Biểu đồ Nến", "Khối lượng", "Chỉ báo Kỹ thuật"])
     
     with tab1:
-        fig = plot_price_history(df, n_days=100)
-        st.plotly_chart(fig, use_container_width=True)
-    
+        st.plotly_chart(plot_price_history(df, n_days=100), use_container_width=True)
     with tab2:
-        fig = plot_candlestick(df, n_days=60)
-        st.plotly_chart(fig, use_container_width=True)
-    
+        st.plotly_chart(plot_candlestick(df, n_days=60), use_container_width=True)
     with tab3:
-        fig = plot_volume(df, n_days=60)
-        st.plotly_chart(fig, use_container_width=True)
-    
+        st.plotly_chart(plot_volume(df, n_days=60), use_container_width=True)
     with tab4:
-        fig = plot_technical_indicators(df, n_days=60)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(plot_technical_indicators(df, n_days=60), use_container_width=True)
     
-    # Model performance
     # Model performance comparison
     if (st.session_state.model_trained and 'metrics' in st.session_state) or \
        (st.session_state.svr_model_trained and 'svr_metrics' in st.session_state):
@@ -1069,43 +1072,36 @@ def display_dashboard():
         st.markdown("---")
         st.header("So sánh hiệu suất mô hình")
         
-        m_tabs = []
-        if st.session_state.model_trained: m_tabs.append("RandomForest")
-        if st.session_state.svr_model_trained: m_tabs.append("SVR")
+        m_tabs_list = []
+        if st.session_state.model_trained: m_tabs_list.append("RandomForest")
+        if st.session_state.svr_model_trained: m_tabs_list.append("SVR")
         
-        if m_tabs:
-            tabs = st.tabs(m_tabs)
-            
+        if m_tabs_list:
+            tabs = st.tabs(m_tabs_list)
             tab_idx = 0
             if st.session_state.model_trained:
                 with tabs[tab_idx]:
-                    if 'metrics' in st.session_state and st.session_state.metrics is not None:
-                        metrics = st.session_state.metrics
+                    metrics = st.session_state.metrics
+                    if metrics is not None:
                         c1, c2, c3, c4 = st.columns(4)
-                        c1.metric("MAE", f"{metrics['MAE']:.6f}")
-                        c2.metric("RMSE", f"{metrics['RMSE']:.6f}")
-                        c3.metric("R² Score", f"{metrics['R2']:.4f}")
-                        c4.metric("Hướng", f"{metrics['Direction_Accuracy']:.2f}%")
+                        c1.metric("MAE", f"{metrics['MAE']:.6f}"); c2.metric("RMSE", f"{metrics['RMSE']:.6f}")
+                        c3.metric("R² Score", f"{metrics['R2']:.4f}"); c4.metric("Hướng", f"{metrics['Direction_Accuracy']:.2f}%")
                     else:
-                        st.info("Chưa có thông tin đánh giá mô hình RF. Vui lòng huấn luyện lại để xem chi tiết.")
-                    
+                        st.info("Không có dữ liệu Metrics cho RF.")
+                        
                     if st.checkbox("Feature Importance (RF)", key="show_fi_rf"):
                         feature_imp = get_feature_importance(st.session_state.model, st.session_state.feature_cols, top_n=15)
                         st.plotly_chart(plot_feature_importance(feature_imp), use_container_width=True)
                 tab_idx += 1
-                
             if st.session_state.svr_model_trained:
                 with tabs[tab_idx]:
-                    if 'svr_metrics' in st.session_state and st.session_state.svr_metrics is not None:
-                        metrics = st.session_state.svr_metrics
+                    metrics = st.session_state.svr_metrics
+                    if metrics is not None:
                         c1, c2, c3, c4 = st.columns(4)
-                        c1.metric("MAE", f"{metrics['MAE']:.6f}")
-                        c2.metric("RMSE", f"{metrics['RMSE']:.6f}")
-                        c3.metric("R² Score", f"{metrics['R2']:.4f}")
-                        c4.metric("Hướng", f"{metrics['Direction_Accuracy']:.2f}%")
+                        c1.metric("MAE", f"{metrics['MAE']:.6f}"); c2.metric("RMSE", f"{metrics['RMSE']:.6f}")
+                        c3.metric("R² Score", f"{metrics['R2']:.4f}"); c4.metric("Hướng", f"{metrics['Direction_Accuracy']:.2f}%")
                     else:
-                        st.info("Chưa có thông tin đánh giá mô hình SVR. Vui lòng huấn luyện lại để xem chi tiết.")
-                    st.info("SVR không hỗ trợ tính toán trực tiếp Feature Importance như RandomForest.")
+                        st.info("Không có dữ liệu Metrics cho SVR.")
 
 
 def display_prediction_inline():
@@ -1116,7 +1112,7 @@ def display_prediction_inline():
     pred = st.session_state.prediction
     results = pred['results']
     
-    st.header("Kết quả Dự báo So sánh")
+    st.markdown('<div class="section-header">KẾT QUẢ DỰ ĐOÁN</div>', unsafe_allow_html=True)
     
     # Display cards for each model
     cols = st.columns(len(results))
@@ -1155,19 +1151,19 @@ def display_prediction_inline():
     # Save action for RF
     with col1:
         if 'RF' in results:
-            if st.button("Lưu Dự báo RF vào CSV", use_container_width=True, type="primary"):
+            if st.button("Lưu dự đoán RF vào CSV", use_container_width=True, type="primary"):
                 save_prediction_to_csv(model_type='RF')
 
     # Save action for SVR
     with col2:
         if 'SVR' in results:
-            if st.button("Lưu Dự báo SVR vào CSV", use_container_width=True, type="primary"):
+            if st.button("Lưu dự đoán SVR vào CSV", use_container_width=True, type="primary"):
                 save_prediction_to_csv(model_type='SVR')
 
 
 def display_7day_prediction_inline():
     """Display 7-day forecast results with table and chart"""
-    st.header("Dự báo Giá 7 Ngày")
+    st.header("Dự đoán giá 7 ngày")
     
     forecast_df = st.session_state.prediction_7days
     
@@ -1288,31 +1284,20 @@ def display_manual_input_form():
         st.write("Vui lòng nhập thông tin thị trường chốt phiên để cập nhật hệ thống:")
         
         with st.form("manual_input_form"):
-            # Nhóm 1: Quan trọng nhất (Giá Đóng & Volume)
-            st.markdown("**1. Thông tin chốt phiên**")
-            c1, c2 = st.columns(2)
-            with c1:
-                price = st.number_input("Giá Đóng cửa (Close/Price)", value=float(df.iloc[-1]['Price']), format="%.4f", help="Giá chốt phiên của ngày mới")
-            with c2:
-                vol = st.number_input("Khối lượng (Volume)", value=int(df.iloc[-1]['Vol']), step=1000, help="Tổng khối lượng giao dịch")
+            price = st.number_input("Giá Đóng (Close)", value=float(df.iloc[-1]['Price']), format="%.4f")
+            vol = st.number_input("Khối lượng (Volume)", value=int(df.iloc[-1]['Vol']), step=1000)
             
-            st.divider()
-            
-            # Nhóm 2: Thông tin chi tiết (OHL)
-            st.markdown("**2. Chi tiết trong ngày**")
-            c3, c4, c5 = st.columns(3)
-            with c3:
-                open_p = st.number_input("Giá Mở cửa (Open)", value=float(df.iloc[-1]['Price']), format="%.4f")
-            with c4:
-                high = st.number_input("Giá Cao nhất (High)", value=float(df.iloc[-1]['Price']), format="%.4f")
-            with c5:
-                low = st.number_input("Giá Thấp nhất (Low)", value=float(df.iloc[-1]['Price']), format="%.4f")
+            # st.markdown("--")
+            # Gọn hơn cho cột 30%
+            c_ohl1, c_ohl2 = st.columns(2)
+            with c_ohl1:
+                open_p = st.number_input("Mở (Open)", value=float(df.iloc[-1]['Price']), format="%.4f")
+                high = st.number_input("Cao (High)", value=float(df.iloc[-1]['Price']), format="%.4f")
+            with c_ohl2:
+                low = st.number_input("Thấp (Low)", value=float(df.iloc[-1]['Price']), format="%.4f")
             
             st.markdown("<br>", unsafe_allow_html=True)
-            
-            # Nút submit lớn
-            submit = st.form_submit_button("XÁC NHẬN & CẬP NHẬT DỮ LIỆU", use_container_width=True, type="primary")
-            
+            submit = st.form_submit_button("XÁC NHẬN CẬP NHẬT", use_container_width=True, type="primary")
             if submit:
                 handle_manual_input_submission(next_date, price, open_p, high, low, vol)
     
@@ -1394,7 +1379,7 @@ def handle_manual_input_submission(date, price, open_p, high, low, vol):
 
 def display_layer2_content():
     """Display Layer 2 (Within-day prediction) content"""
-    st.header("Dự đoán giá trong ngày (Layer 2)")
+    st.header("Dự đoán giá trong ngày")
     
     if st.session_state.df_features is None:
         st.info("Vui lòng tải dữ liệu ở Sidebar trước.")
@@ -1440,10 +1425,29 @@ def display_layer2_content():
         st.warning(f"Chưa có đủ dự đoán Layer 1 (RF & SVR) cho ngày {target_date.strftime('%d/%m/%Y')}. Vui lòng qua Tab Layer 1 huấn luyện và dự đoán cả 2 mô hình trước.")
         return
 
-    st.success(f"Mục tiêu: Dự đoán giá Đóng cửa cho ngày **{target_date.strftime('%d/%m/%Y')}**")
-    col_l1a, col_l1b = st.columns(2)
-    col_l1a.info(f"RF L1: **${l1_rf_target:.4f}**")
-    col_l1b.info(f"SVR L1: **${l1_svr_target:.4f}**")
+    # --- Layer 1 Summary Dashboard (New Design) ---
+    st.markdown(f"""
+    <div style="background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 12px; padding: 15px; margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; margin-bottom: 12px;">
+            <div style="width: 4px; height: 18px; background-color: #007BFF; margin-right: 10px; border-radius: 2px;"></div>
+            <div style="font-weight: 700; color: #1F2937; font-size: 0.9rem; text-transform: uppercase;">Thông tin từ Layer 1 (Xác nhận mục tiêu)</div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+            <div style="background: white; padding: 10px; border-radius: 8px; border: 1px solid #F3F4F6; text-align: center;">
+                <div style="font-size: 0.7rem; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px;">Ngày mục tiêu</div>
+                <div style="font-size: 1rem; font-weight: 600; color: #111827;">{target_date.strftime('%d/%m/%Y')}</div>
+            </div>
+            <div style="background: white; padding: 10px; border-radius: 8px; border: 1px solid #F3F4F6; text-align: center;">
+                <div style="font-size: 0.7rem; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px;">RF Dự đoán (L1)</div>
+                <div style="font-size: 1rem; font-weight: 600; color: #00b894;">${format_number(l1_rf_target)}</div>
+            </div>
+            <div style="background: white; padding: 10px; border-radius: 8px; border: 1px solid #F3F4F6; text-align: center;">
+                <div style="font-size: 0.7rem; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px;">SVR Dự đoán (L1)</div>
+                <div style="font-size: 1rem; font-weight: 600; color: #00b894;">${format_number(l1_svr_target)}</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     # 2. User Input
     with st.form("layer2_form"):
@@ -1474,10 +1478,13 @@ def display_layer2_content():
                     pred_ridge = predict_layer2(st.session_state.l2_ridge_model, st.session_state.l2_ridge_scaler, l2_input)
                     with res_col1:
                         st.markdown(f"""
-                        <div class="prediction-box" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
-                            <h3 style="color: white; margin-bottom: 0px;">L2: Ridge (Thống kê)</h3>
-                            <h1 style="color: white; font-size: 3rem; margin-top: 10px;">${pred_ridge:.4f}</h1>
-                            <p style="color: white; font-size: 0.9rem;">(Dựa trên O-H-L-V & L1 Hybrid)</p>
+                        <div class="prediction-card">
+                            <div class="pred-title">L2: Ridge (Thống kê)</div>
+                            <div class="pred-sub">Dự báo giá chốt phiên (Dựa trên O-H-L-V & L1 Hybrid)</div>
+                            <div class="pred-price" style="color: #0984e3;">${format_number(pred_ridge)}</div>
+                            <div class="confidence-box" style="background-color: #ebf5ff;">
+                                <span style="font-size: 0.8rem; color: #0984e3; font-weight: 500;">Dựa trên phân tích hồi quy sai số</span>
+                            </div>
                         </div>
                         """, unsafe_allow_html=True)
                 
@@ -1485,10 +1492,13 @@ def display_layer2_content():
                     pred_l2_svr = predict_layer2(st.session_state.l2_svr_model, st.session_state.l2_svr_scaler, l2_input)
                     with res_col2:
                         st.markdown(f"""
-                        <div class="prediction-box" style="background: linear-gradient(135deg, #FF512F 0%, #DD2476 100%);">
-                            <h3 style="color: white; margin-bottom: 0px;">L2: SVR (Máy học)</h3>
-                            <h1 style="color: white; font-size: 3rem; margin-top: 10px;">${pred_l2_svr:.4f}</h1>
-                            <p style="color: white; font-size: 0.9rem;">(Dựa trên O-H-L-V & L1 Hybrid)</p>
+                        <div class="prediction-card">
+                            <div class="pred-title">L2: SVR (Máy học)</div>
+                            <div class="pred-sub">Dự báo giá chốt phiên (Dựa trên O-H-L-V & L1 Hybrid)</div>
+                            <div class="pred-price" style="color: #6c5ce7;">${format_number(pred_l2_svr)}</div>
+                            <div class="confidence-box" style="background-color: #f3f0ff;">
+                                <span style="font-size: 0.8rem; color: #6c5ce7; font-weight: 500;">Dựa trên thuật toán Vector Support</span>
+                            </div>
                         </div>
                         """, unsafe_allow_html=True)
                 
@@ -1580,7 +1590,7 @@ def train_layer2_logic():
             st.session_state.l2_svr_scaler = svr_scaler_l2
             st.session_state.l2_svr_model_trained = True
             
-            st.toast("✓ Đã train Layer 2 (Ridge & SVR) thành công!", icon="🚀")
+            st.toast("Đã train Layer 2 (Ridge & SVR) thành công!")
             
         except Exception as e:
             st.error(f"Lỗi khi train L2: {e}")
@@ -1599,7 +1609,7 @@ def load_l2_model():
                 st.session_state.l2_ridge_model = ridge_model
                 st.session_state.l2_ridge_scaler = ridge_scaler
                 st.session_state.l2_ridge_model_trained = True
-                st.toast("Đã tải mô hình L2 Ridge", icon="📥")
+                st.toast("Đã tải mô hình L2 Ridge")
                 
             # Load SVR
             svr_model = load_model(L2_SVR_MODEL_PATH)
@@ -1608,9 +1618,9 @@ def load_l2_model():
                 st.session_state.l2_svr_model = svr_model
                 st.session_state.l2_svr_scaler = svr_scaler
                 st.session_state.l2_svr_model_trained = True
-                st.toast("Đã tải mô hình L2 SVR", icon="📥")
+                st.toast("Đã tải mô hình L2 SVR")
                 
-            st.toast("✓ Tải mô hình Layer 2 hoàn tất!", icon="✅")
+            st.toast("Tải mô hình Layer 2 hoàn tất!")
         except Exception as e:
             st.error(f"Lỗi khi load L2 models: {e}")
 
